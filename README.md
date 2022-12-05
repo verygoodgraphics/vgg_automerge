@@ -73,13 +73,13 @@ assert(json(automerge_doc) == json::parse(R"({
 
 - configure
 
-  `cmake --preset <configurePreset>`, where  `<configurePreset>`  is the name of the active Configure Preset.
+  `cmake --preset <configurePreset>`, where `<configurePreset>` is the name of the active Configure Preset.
 
 - build
 
   `cmake --build out/build/<configurePreset>`
 
-  or `cmake --build --preset <buildPreset>`, where  `<buildPreset>`  is the name of the active Build Preset.
+  or `cmake --build --preset <buildPreset>`, where `<buildPreset>` is the name of the active Build Preset.
 
 ## Thanks
 Thanks to [automerge](https://github.com/automerge/automerge-rs) contributors' awesome work.
