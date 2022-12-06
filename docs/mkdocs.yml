@@ -1,0 +1,6 @@
+site_name: VGG Automerge
+site_url: https://verygoodgraphics.github.io/vgg_automerge/
+nav:
+    - Home: index.md
+    - API: api.md
+theme: readthedocs
