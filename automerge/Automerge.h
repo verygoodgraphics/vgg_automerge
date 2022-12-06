@@ -18,6 +18,7 @@
 #include "transaction/Transaction.h"
 #include "Clock.h"
 #include "transaction/CommitOptions.h"
+#include "Sync.h"
 #include "Error.h"
 #include "nlohmann/json.hpp"
 
@@ -183,10 +184,15 @@ struct Automerge {
     std::vector<u8> save();
 
     // save_incremental
+        
+    // Filter the changes down to those that are not transitive dependencies of the heads.
+    // Thus a graph with these heads has not seen the remaining changes.
+    // throw AutomergeError
+    void filter_changes(const std::vector<ChangeHash>& heads, std::set<ChangeHash>& changes) const;
 
-    // void filter_changes() {}
-
-    // get_missing_deps
+    // Get the hashes of the changes in this document that aren't transitive dependencies of the
+    // given `heads`.
+    std::vector<ChangeHash> get_missing_deps(const std::vector<ChangeHash>& heads) const;
 
     // Get the changes since `have_deps` in this document using a clock internally.
     // throw AutomergeError
@@ -222,6 +228,21 @@ struct Automerge {
     std::string to_string(Export&& id) const;
 
     // dump, visualise_optree
+
+    std::optional<SyncMessage> generate_sync_message(State& sync_state) const;
+
+    // throw
+    void receive_sync_message(State& sync_state, SyncMessage&& message) {
+        receive_sync_message_with(sync_state, std::move(message), nullptr);
+    }
+
+    // throw
+    void receive_sync_message_with(State& sync_state, SyncMessage&& message, OpObserver *options);
+
+    Have make_bloom_filter(std::vector<ChangeHash>&& last_sync) const;
+
+    // throw
+    std::vector<const Change*> get_changes_to_send(const std::vector<Have>& have, const std::vector<ChangeHash>& need) const;
 
     /*!
     @brief add a new item with a new path, the parent path should exist

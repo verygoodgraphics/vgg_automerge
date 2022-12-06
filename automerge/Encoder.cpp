@@ -40,6 +40,25 @@ usize Encoder::encode(const std::vector<u8>& val) {
     return head + val.size();
 }
 
+usize Encoder::encode(const BinSlice& val) {
+    usize head = encode(val.second);
+    out_buf.insert(out_buf.end(), val.first, val.first + val.second);
+
+    return head + val.second;
+}
+
+usize Encoder::encode(const std::vector<ChangeHash>& val) {
+    usize head = encode(val.size());
+    usize body = 0;
+
+    for (auto& hash : val) {
+        std::copy(std::begin(hash.data), std::end(hash.data), std::back_inserter(out_buf));
+        body += HASH_SIZE;
+    }
+
+    return head + body;
+}
+
 usize Encoder::write_unsigned(u64 val) {
     usize bytes_written = 0;
 

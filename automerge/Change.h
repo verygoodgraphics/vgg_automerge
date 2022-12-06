@@ -39,6 +39,10 @@ struct ChangeBytes {
         return { uncompressed.cbegin(), uncompressed.size() };
     }
 
+    void compress(usize body_start) {
+        // TODO: compress
+    }
+
     BinSlice raw() const {
         if (isCompressed) {
             return { compressed.cbegin(), compressed.size() };
@@ -94,6 +98,10 @@ struct ChunkIntermediate {
     Range extra_bytes = {};
 };
 
+// TryFrom<Vec<u8>> for Change
+// throw exception
+Change decode_change(std::vector<u8>&& _bytes);
+
 // #[derive(PartialEq, Debug, Clone)]
 struct Change {
     ChangeBytes bytes = {};
@@ -121,6 +129,11 @@ struct Change {
         return actors[0];
     }
 
+    static std::optional<Change> from_bytes(std::vector<u8>&& bytes) {
+        // TODO: handle exception
+        return decode_change(std::move(bytes));
+    }
+
     bool is_empty() const {
         return len() == 0;
     }
@@ -141,6 +154,10 @@ struct Change {
 
     BinSlice get_extra_bytes() const {
         return { bytes.uncompressed.cbegin() + extra_bytes.first, extra_bytes.second - extra_bytes.first };
+    }
+
+    void compress() {
+        bytes.compress(body_start);
     }
 };
 
@@ -167,10 +184,6 @@ static T read_slice(const BinSlice& bytes, Range& cursor) {
 
 // throw exception
 static Range slice_bytes(const BinSlice& bytes, Range& cursor);
-
-// TryFrom<Vec<u8>> for Change
-// throw exception
-static Change decode_change(std::vector<u8>&& _bytes);
 
 // throw exception
 static ChangeBytes decompress_chunk(Range&& preamble, Range&& body, std::vector<u8>&& compressed);

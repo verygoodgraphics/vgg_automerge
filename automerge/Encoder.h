@@ -71,6 +71,10 @@ public:
 
     usize encode(const std::vector<u8>& val);
 
+    usize encode(const BinSlice& val);
+
+    usize encode(const std::vector<ChangeHash>& val);
+
 private:
     std::vector<u8>& out_buf;
 

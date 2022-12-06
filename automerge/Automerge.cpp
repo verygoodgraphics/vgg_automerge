@@ -378,6 +378,14 @@ std::vector<u8> Automerge::save() {
     return bytes;
 }
 
+void Automerge::filter_changes(const std::vector<ChangeHash>& heads, std::set<ChangeHash>& changes) const {
+    return;
+}
+
+std::vector<ChangeHash> Automerge::get_missing_deps(const std::vector<ChangeHash>& heads) const {
+    return {};
+}
+
 std::vector<const Change*> Automerge::get_changes_clock(const std::vector<ChangeHash>& have_deps) const {
     // get the clock for the given deps
     auto clock = clock_at(have_deps);
@@ -552,6 +560,232 @@ std::string Automerge::to_string(Export&& id) const {
 
 /////////////////////////////////////////////////////////
 
+std::optional<SyncMessage> Automerge::generate_sync_message(State& sync_state) const {
+    auto our_heads = get_heads();
+
+    auto our_need = get_missing_deps(sync_state.their_heads.value_or(std::vector<ChangeHash>()));
+    
+    // TODO: optimise
+    std::unordered_set<ChangeHash> their_heads_set;
+    if (sync_state.their_heads) {
+        for (auto& head : *sync_state.their_heads) {
+            their_heads_set.insert(head);
+        }
+    }
+
+    std::vector<Have> our_have;
+    if (std::all_of(our_heads.cbegin(), our_heads.cend(), [&](const ChangeHash& hash) {
+        return their_heads_set.count(hash);
+        })) {
+        our_have.push_back(make_bloom_filter(std::vector<ChangeHash>(sync_state.shared_heads)));
+    }
+
+    if (sync_state.their_have && !sync_state.their_have->empty()) {
+        auto& last_sync = sync_state.their_have->front().last_sync;
+        if (std::all_of(last_sync.cbegin(), last_sync.cend(), [&](const ChangeHash& hash) {
+            return get_change_by_hash(hash).has_value();
+            })) {
+            return SyncMessage{
+                std::move(our_heads),
+                {},
+                { Have() },
+                {}
+            };
+        }
+    }
+
+    std::vector<const Change*> changes_to_send;
+    if (sync_state.their_have && sync_state.their_need) {
+        changes_to_send = get_changes_to_send(*sync_state.their_have, *sync_state.their_need);
+    }
+
+    bool heads_unchanged = sync_state.last_sent_heads == our_heads;
+
+    bool heads_equal = false;
+    if (sync_state.their_heads) {
+        heads_equal = *sync_state.their_heads == our_heads;
+    }
+
+    if (heads_unchanged && heads_equal && changes_to_send.empty()) {
+        return {};
+    }
+
+    // deduplicate the changes to send with those we have already sent and clone it now
+    std::vector<Change> changes;
+    for (auto change : changes_to_send) {
+        if (!sync_state.sent_hashes.count(change->hash)) {
+            changes.push_back(*change);
+        }
+    }
+
+    sync_state.last_sent_heads = our_heads;
+    for (auto c : changes_to_send) {
+        sync_state.sent_hashes.insert(c->hash);
+    }
+
+    return SyncMessage{
+        std::move(our_heads),
+        std::move(our_need),
+        std::move(our_have),
+        std::move(changes)
+    };
+}
+
+void Automerge::receive_sync_message_with(State& sync_state, SyncMessage&& message, OpObserver* options) {
+    auto before_heads = get_heads();
+
+    auto& [message_heads, message_need, message_have, message_changes] = message;
+
+    bool change_is_empty = message_changes.empty();
+    if (!change_is_empty) {
+        apply_changes_with(std::move(message_changes), options);
+        auto new_heads = get_heads();
+        sync_state.shared_heads = advance_heads(
+            std::unordered_set<ChangeHash>(before_heads.cbegin(), before_heads.cend()),
+            std::unordered_set<ChangeHash>(new_heads.begin(), new_heads.end()),
+            sync_state.shared_heads
+        );
+    }
+
+    // trim down the sent hashes to those that we know they haven't seen
+    filter_changes(message_heads, sync_state.sent_hashes);
+
+    if (change_is_empty && (message_heads == before_heads)) {
+        sync_state.last_sent_heads = message_heads;
+    }
+
+    std::vector<const ChangeHash*> known_heads;
+    for (auto& head : message_heads) {
+        if (get_change_by_hash(head).has_value()) {
+            known_heads.push_back(&head);
+        }
+    }
+    if (known_heads.size() == message_heads.size()) {
+        sync_state.shared_heads = message_heads;
+        // If the remote peer has lost all its data, reset our state to perform a full resync
+        if (message_heads.empty()) {
+            sync_state.last_sent_heads.clear();
+            sync_state.sent_hashes.clear();
+        }
+    }
+    else {
+        auto& shared = sync_state.shared_heads;
+        shared.reserve(shared.size() + known_heads.size());
+        for (auto head : known_heads) {
+            shared.push_back(*head);
+        }
+
+        std::sort(shared.begin(), shared.end());
+
+        auto last = std::unique(shared.begin(), shared.end());
+        shared.erase(last, shared.end());
+    }
+
+    sync_state.their_have = std::move(message_have);
+    sync_state.their_heads = std::move(message_heads);
+    sync_state.their_need = std::move(message_need);
+
+    return;
+}
+
+Have Automerge::make_bloom_filter(std::vector<ChangeHash>&& last_sync) const {
+    auto new_changes = get_changes(last_sync);
+    
+    std::vector<const ChangeHash*> hashes;
+    hashes.reserve(new_changes.size());
+    for (auto change : new_changes) {
+        hashes.push_back(&change->hash);
+    }
+
+    return Have {
+        std::move(last_sync),
+        BloomFilter(std::move(hashes))
+    };
+}
+
+std::vector<const Change*> Automerge::get_changes_to_send(const std::vector<Have>& have, const std::vector<ChangeHash>& need) const {
+    std::vector<const Change*> changes_to_send;
+
+    if (have.empty()) {
+        for (auto& hash : need) {
+            auto change = get_change_by_hash(hash);
+            if (change) {
+                changes_to_send.push_back(*change);
+            }
+        }
+
+        return changes_to_send;
+    }
+
+    // TODO: optimise
+    std::unordered_set<ChangeHash> last_sync_hashes_set;
+    std::vector<const BloomFilter*> bloom_filters;
+    bloom_filters.reserve(have.size());
+
+    for (auto& h : have) {
+        auto& [last_sync, bloom] = h;
+        last_sync_hashes_set.insert(last_sync.cbegin(), last_sync.cend());
+        bloom_filters.push_back(&bloom);
+    }
+    std::vector<ChangeHash> last_sync_hashes(last_sync_hashes_set.cbegin(), last_sync_hashes_set.cend());
+
+    auto changes = get_changes(last_sync_hashes);
+
+    std::unordered_set<ChangeHash> change_hashes;
+    change_hashes.reserve(changes.size());
+    std::unordered_map<ChangeHash, std::vector<ChangeHash>> dependents;
+    std::unordered_set<ChangeHash> hashes_to_send;
+
+    for (auto change : changes) {
+        change_hashes.insert(change->hash);
+
+        for (auto& dep : change->deps) {
+            dependents[dep].push_back(change->hash);
+        }
+
+        if (std::all_of(bloom_filters.cbegin(), bloom_filters.cend(), [&](const BloomFilter* bloom) {
+            return !bloom->contains_hash(change->hash);
+            })) {
+            hashes_to_send.insert(change->hash);
+        }
+    }
+
+    std::vector<ChangeHash> stack(hashes_to_send.cbegin(), hashes_to_send.cend());
+    while (!stack.empty()) {
+        ChangeHash hash(std::move(stack.back()));
+        stack.pop_back();
+
+        auto deps = dependents.find(hash);
+        if (deps != dependents.end()) {
+            for (auto& dep : deps->second) {
+                if (hashes_to_send.insert(dep).second) {
+                    stack.push_back(dep);
+                }
+            }
+        }
+    }
+
+    for (auto& hash : need) {
+        hashes_to_send.insert(hash);
+        if (!change_hashes.count(hash)) {
+            auto change = get_change_by_hash(hash);
+            if (change) {
+                changes_to_send.push_back(*change);
+            }
+        }
+    }
+
+    for (auto change : changes) {
+        if (hashes_to_send.count(change->hash)) {
+            changes_to_send.push_back(change);
+        }
+    }
+
+    return changes_to_send;
+}
+
+/////////////////////////////////////////////////////////
+
 static json map_to_json(const Automerge& doc, const ExId& obj);
 static json list_to_json(const Automerge& doc, const ExId& obj);
 static Automerge json_to_automerge(const json& value);
@@ -583,7 +817,7 @@ static json scalar_to_json(ScalarValue& value) {
         return json(std::get<Counter>(value.data).current);
     case ScalarValue::Boolean:
         return json(std::get<bool>(value.data));
-    case ScalarValue::Null:
+    case ScalarValue::Null: 
     default:
         return json();
     }

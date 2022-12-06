@@ -57,7 +57,12 @@ add_library (automerge STATIC
 	"query/Len.h"
 	"query/Len.cpp"
 	"Op.cpp"
-)
+	"Sync.h"
+	"sync/State.h"
+	"sync/Bloom.h"
+	"sync/Bloom.cpp"
+	"sync/State.cpp"
+	"Sync.cpp")
 
 target_include_directories(automerge PUBLIC
 	${VGG_CONTRIB_JSON_INCLUDE}
