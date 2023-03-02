@@ -68,6 +68,7 @@ target_include_directories(automerge PUBLIC
 	${VGG_CONTRIB_JSON_INCLUDE}
 	${VGG_CONTRIB_PICOSHA2_INCLUDE}
 	${VGG_CONTRIB_SDEFL_INCLUDE}
+	.
 )
 
 add_executable (demo
