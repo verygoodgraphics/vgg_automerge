@@ -227,7 +227,11 @@ struct Automerge {
 
     std::string to_string(Export&& id) const;
 
-    // dump, visualise_optree
+    std::string dump(const u8 indent = 0) const {
+        return json_doc.dump(indent);
+    }
+
+    // visualise_optree
 
     std::optional<SyncMessage> generate_sync_message(State& sync_state) const;
 
@@ -288,7 +292,17 @@ struct Automerge {
         }
     }
 
+    /*!
+    @brief return the current json object of Automerge doc
+    @return a const reference of the json object
+    */
+    const json& json_const_ref() const {
+        return json_doc;
+    }
+
 private:
+    // json object of the whole doc, updated by every operation, always equals to the result of to_json()
+    json json_doc;
     std::optional<Transaction> _transaction = {};
 
     void ensure_transaction_open() {

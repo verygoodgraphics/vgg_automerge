@@ -266,6 +266,9 @@ void Automerge::apply_changes_with(std::vector<Change>&& changes, OpObserver* op
             apply_change(std::move(*c), options);
         }
     }
+
+    // TODO: optimize
+    json_doc = *this;
 }
 
 void Automerge::apply_change(Change&& change, OpObserver* observer) {
@@ -1166,8 +1169,9 @@ void Automerge::json_add(const json::json_pointer& path, const json& value) {
     }
 
     // get the object id of the parent path and the property of the path
-    auto& [parent_id, prop] = (item.tag == JsonPathParsed::ExistedPath) ?
+    auto& item_data = (item.tag == JsonPathParsed::ExistedPath) ?
         std::get<PropPair>(std::get<ValueTuple>(item.data)) : std::get<PropPair>(item.data);
+    auto& [parent_id, prop] = item_data;
 
     // insert into a map, the path should not exist
     if ((prop.tag == Prop::Map) && (item.tag == JsonPathParsed::ExistedPath)) {
@@ -1206,6 +1210,18 @@ void Automerge::json_add(const json::json_pointer& path, const json& value) {
 
         // Second, add sub items under the root_id
         json_to_transaction(root_id, vals, *_transaction);
+    }
+
+    // update json doc
+    if (item_data.second.tag == Prop::Seq) {
+        // add an item into an array of json
+        auto& parent_ref = json_doc[path.parent_pointer()];
+        auto index = std::stoi(path.back());
+        parent_ref.insert(parent_ref.begin() + index, value);
+    }
+    else {
+        // add an item into a map of json
+        json_doc[path] = value;
     }
 }
 
@@ -1247,6 +1263,10 @@ void Automerge::json_replace(const json::json_pointer& path, const json& value) 
         auto& scalar = std::get<ScalarValue>(root_value.data);
         _transaction->put(std::move(parent_id), std::move(prop), std::move(scalar));
     }
+
+    // update json doc
+    auto& item_ref = json_doc[path];
+    item_ref = value;
 }
 
 void Automerge::json_delete(const json::json_pointer& path) {
@@ -1266,4 +1286,22 @@ void Automerge::json_delete(const json::json_pointer& path) {
     ensure_transaction_open();
 
     _transaction->delete_(std::move(parent_id), std::move(prop));
+
+    // update json doc
+    try {
+        auto& parent_ref = json_doc.at(path.parent_pointer());
+        if (prop.tag == Prop::Seq) {
+            // delete an item from an array of json
+            auto index = std::stoi(path.back());
+            parent_ref.erase(index);
+        }
+        else {
+            // delete an item from a map of json
+            auto& key = path.back();
+            parent_ref.erase(key);
+        }
+    }
+    catch (std::exception) {
+        throw std::runtime_error("invalid path: " + path.to_string());
+    }
 }
