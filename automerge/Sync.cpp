@@ -4,20 +4,20 @@
 
 std::vector<u8> SyncMessage::encode() {
     std::vector<u8> buf;
-    buf.reserve(MESSAGE_TYPE_SYNC);
+    buf.push_back(MESSAGE_TYPE_SYNC);
 
     Encoder encoder(buf);
 
     encoder.encode(heads);
     encoder.encode(need);
 
-    encoder.encode((u32)have.size());    
+    encoder.encode((u64)have.size());    
     for (auto& h : have) {
         encoder.encode(h.last_sync);
         encoder.encode(h.bloom.to_bytes());
     }
 
-    encoder.encode((u32)changes.size());
+    encoder.encode((u64)changes.size());
     for (auto& change : changes) {
         change.compress();
         encoder.encode(change.bytes.raw());
@@ -48,7 +48,7 @@ std::optional<SyncMessage> SyncMessage::decode(const BinSlice& bytes) {
         return {};
     }
 
-    auto have_count = decoder.read<u32>();
+    auto have_count = decoder.read<u64>();
     if (!have_count) {
         return {};
     }
@@ -77,7 +77,7 @@ std::optional<SyncMessage> SyncMessage::decode(const BinSlice& bytes) {
             });
     }
 
-    auto change_count = decoder.read<u32>();
+    auto change_count = decoder.read<u64>();
     if (!change_count) {
         return {};
     }
@@ -106,22 +106,23 @@ std::optional<SyncMessage> SyncMessage::decode(const BinSlice& bytes) {
     };
 }
 
-// TODO: optimise
+// TODO: optimise, use pointer in set
 std::vector<ChangeHash> advance_heads(
-    const std::unordered_set<ChangeHash>& my_old_heads,
-    const std::unordered_set<ChangeHash>& my_new_heads,
-    const std::vector<ChangeHash>& our_old_shared_heads
+    std::unordered_set<ChangeHash>&& my_old_heads,
+    std::unordered_set<ChangeHash>&& my_new_heads,
+    std::vector<ChangeHash>&& our_old_shared_heads
 ) {
     std::vector<ChangeHash> advanced_heads;
     for (auto& head : my_new_heads) {
         if (!my_old_heads.count(head)) {
+            // items in set can't move
             advanced_heads.push_back(head);
         }
     }
 
-    for (auto& head : our_old_shared_heads) {
+    for (auto&& head : our_old_shared_heads) {
         if (my_new_heads.count(head)) {
-            advanced_heads.push_back(head);
+            advanced_heads.push_back(std::move(head));
         }
     }
 

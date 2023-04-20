@@ -42,10 +42,10 @@ bool bin_slice_cmp(const BinSlice& a, const BinSlice& b) {
 
 static struct sdefl sdefl;
 
-std::vector<u8> deflate_compress(const std::vector<u8>& data) {
-    u8* comp = new u8[data.size() * 2]();
+std::vector<u8> deflate_compress(const BinSlice& data) {
+    u8* comp = new u8[data.second * 2]();
 
-    int len = sdeflate(&sdefl, comp, data.data(), (int)data.size(), SDEFL_LVL_DEF);
+    int len = sdeflate(&sdefl, comp, &(*data.first), (int)data.second, SDEFL_LVL_DEF);
     std::vector<u8> res(std::make_move_iterator(comp), std::make_move_iterator(comp + len));
 
     delete[]comp;

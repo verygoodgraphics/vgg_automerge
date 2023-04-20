@@ -126,7 +126,7 @@ void ColData::deflate() {
 
     if (data.size() > DEFLATE_MIN_SIZE) {
         col |= COLUMN_TYPE_DEFLATE;
-        data = deflate_compress(data);
+        data = deflate_compress({ data.cbegin(), data.size() });
     }
 }
 

@@ -39,9 +39,7 @@ struct ChangeBytes {
         return { uncompressed.cbegin(), uncompressed.size() };
     }
 
-    void compress(usize body_start) {
-        // TODO: compress
-    }
+    void compress(usize body_start);
 
     BinSlice raw() const {
         if (isCompressed) {

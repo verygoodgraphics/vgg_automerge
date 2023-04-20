@@ -382,13 +382,25 @@ std::vector<u8> Automerge::save() {
 }
 
 void Automerge::filter_changes(const std::vector<ChangeHash>& heads, std::set<ChangeHash>& changes) const {
+    std::vector<ChangeHash> h;
+    for (auto& hash : heads) {
+        if (histroy_index.count(hash)) {
+            h.push_back(hash);
+        }
+    }
+
+    // TODO: change_graph
+
     return;
 }
 
 std::vector<ChangeHash> Automerge::get_missing_deps(const std::vector<ChangeHash>& heads) const {
+    // TODO: get_missing_deps
+
     return {};
 }
 
+// TODO: update clock related API
 std::vector<const Change*> Automerge::get_changes_clock(const std::vector<ChangeHash>& have_deps) const {
     // get the clock for the given deps
     auto clock = clock_at(have_deps);
@@ -568,7 +580,7 @@ std::optional<SyncMessage> Automerge::generate_sync_message(State& sync_state) c
 
     auto our_need = get_missing_deps(sync_state.their_heads.value_or(std::vector<ChangeHash>()));
     
-    // TODO: optimise
+    // TODO: optimise, use pointer in set
     std::unordered_set<ChangeHash> their_heads_set;
     if (sync_state.their_heads) {
         for (auto& head : *sync_state.their_heads) {
@@ -597,9 +609,9 @@ std::optional<SyncMessage> Automerge::generate_sync_message(State& sync_state) c
         }
     }
 
-    std::vector<const Change*> changes_to_send;
+    std::vector<const Change*> changes_to_send_p;
     if (sync_state.their_have && sync_state.their_need) {
-        changes_to_send = get_changes_to_send(*sync_state.their_have, *sync_state.their_need);
+        changes_to_send_p = get_changes_to_send(*sync_state.their_have, *sync_state.their_need);
     }
 
     bool heads_unchanged = sync_state.last_sent_heads == our_heads;
@@ -609,28 +621,35 @@ std::optional<SyncMessage> Automerge::generate_sync_message(State& sync_state) c
         heads_equal = *sync_state.their_heads == our_heads;
     }
 
-    if (heads_unchanged && heads_equal && changes_to_send.empty()) {
-        return {};
+    // deduplicate the changes to send with those we have already sent and clone it now
+    std::vector<Change> changes_to_send;
+    for (auto& change : changes_to_send_p) {
+        if (!sync_state.sent_hashes.count(change->hash)) {
+            changes_to_send.push_back(*change);
+        }
     }
 
-    // deduplicate the changes to send with those we have already sent and clone it now
-    std::vector<Change> changes;
-    for (auto change : changes_to_send) {
-        if (!sync_state.sent_hashes.count(change->hash)) {
-            changes.push_back(*change);
+    if (heads_unchanged) {
+        if (heads_equal&& changes_to_send.empty()) {
+            return {};
+        }
+        if (sync_state.in_flight) {
+            return {};
         }
     }
 
     sync_state.last_sent_heads = our_heads;
-    for (auto c : changes_to_send) {
-        sync_state.sent_hashes.insert(c->hash);
+    for (auto& c : changes_to_send) {
+        sync_state.sent_hashes.insert(c.hash);
     }
+
+    sync_state.in_flight = true;
 
     return SyncMessage{
         std::move(our_heads),
         std::move(our_need),
         std::move(our_have),
-        std::move(changes)
+        std::move(changes_to_send)
     };
 }
 
@@ -645,8 +664,8 @@ void Automerge::receive_sync_message_with(State& sync_state, SyncMessage&& messa
         auto new_heads = get_heads();
         sync_state.shared_heads = advance_heads(
             std::unordered_set<ChangeHash>(before_heads.cbegin(), before_heads.cend()),
-            std::unordered_set<ChangeHash>(new_heads.begin(), new_heads.end()),
-            sync_state.shared_heads
+            std::unordered_set<ChangeHash>(std::make_move_iterator(new_heads.begin()), std::make_move_iterator(new_heads.end())),
+            std::move(sync_state.shared_heads)
         );
     }
 
@@ -657,6 +676,10 @@ void Automerge::receive_sync_message_with(State& sync_state, SyncMessage&& messa
         sync_state.last_sent_heads = message_heads;
     }
 
+    if (sync_state.sent_hashes.empty()) {
+        sync_state.in_flight = false;
+    }
+
     std::vector<const ChangeHash*> known_heads;
     for (auto& head : message_heads) {
         if (get_change_by_hash(head).has_value()) {
@@ -665,6 +688,7 @@ void Automerge::receive_sync_message_with(State& sync_state, SyncMessage&& messa
     }
     if (known_heads.size() == message_heads.size()) {
         sync_state.shared_heads = message_heads;
+        sync_state.in_flight = false;
         // If the remote peer has lost all its data, reset our state to perform a full resync
         if (message_heads.empty()) {
             sync_state.last_sent_heads.clear();
@@ -720,7 +744,7 @@ std::vector<const Change*> Automerge::get_changes_to_send(const std::vector<Have
         return changes_to_send;
     }
 
-    // TODO: optimise
+    // TODO: optimise, use pointer in set
     std::unordered_set<ChangeHash> last_sync_hashes_set;
     std::vector<const BloomFilter*> bloom_filters;
     bloom_filters.reserve(have.size());
@@ -755,7 +779,7 @@ std::vector<const Change*> Automerge::get_changes_to_send(const std::vector<Have
 
     std::vector<ChangeHash> stack(hashes_to_send.cbegin(), hashes_to_send.cend());
     while (!stack.empty()) {
-        ChangeHash hash(std::move(stack.back()));
+        ChangeHash hash = std::move(stack.back());
         stack.pop_back();
 
         auto deps = dependents.find(hash);
@@ -778,7 +802,7 @@ std::vector<const Change*> Automerge::get_changes_to_send(const std::vector<Have
         }
     }
 
-    for (auto change : changes) {
+    for (auto& change : changes) {
         if (hashes_to_send.count(change->hash)) {
             changes_to_send.push_back(change);
         }

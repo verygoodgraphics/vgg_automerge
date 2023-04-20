@@ -4,7 +4,7 @@
 
 std::vector<u8> State::encode() const {
     std::vector<u8> buf;
-    buf.reserve(SYNC_STATE_TYPE);
+    buf.push_back(SYNC_STATE_TYPE);
 
     Encoder encoder(buf);
     encoder.encode(shared_heads);
@@ -35,12 +35,13 @@ std::optional<State> State::decode(const BinSlice& bytes) {
         {},
         {},
         std::vector<Have>(),
-        {}
+        {},
+        false
     };
 }
 
 std::optional<std::vector<ChangeHash>> decode_hashes(Decoder& decoder) {
-    std::optional<u32> len = decoder.read<u32>();
+    std::optional<u64> len = decoder.read<u64>();
     if (!len) {
         return {};
     }

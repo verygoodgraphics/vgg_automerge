@@ -13,11 +13,11 @@
 constexpr u32 BITS_PER_ENTRY = 10;
 constexpr u32 NUM_PROBES = 7;
 
-// #[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
+// #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize)]
 struct BloomFilter {
-    u32 num_entries;
-    u32 num_bits_per_entry;
-    u32 num_probes;
+    u32 num_entries = 0;
+    u32 num_bits_per_entry = BITS_PER_ENTRY;
+    u32 num_probes = NUM_PROBES;
     std::vector<u8> bits;
 
     BloomFilter() = default;
@@ -43,4 +43,3 @@ struct BloomFilter {
 
     bool contains_hash(const ChangeHash& hash) const;
 };
-

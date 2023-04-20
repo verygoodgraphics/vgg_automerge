@@ -32,7 +32,7 @@ struct SyncMessage {
 };
 
 std::vector<ChangeHash> advance_heads(
-    const std::unordered_set<ChangeHash>& my_old_heads,
-    const std::unordered_set<ChangeHash>& my_new_heads,
-    const std::vector<ChangeHash>& our_old_shared_heads
+    std::unordered_set<ChangeHash>&& my_old_heads,
+    std::unordered_set<ChangeHash>&& my_new_heads,
+    std::vector<ChangeHash>&& our_old_shared_heads
 );

@@ -62,6 +62,33 @@ std::vector<u8> encode_document(std::vector<ChangeHash>&& heads, const std::vect
 
 /////////////////////////////////////////////////////////
 
+void ChangeBytes::compress(usize body_start) {
+    if (isCompressed) {
+        return;
+    }
+    
+    if (uncompressed.size() <= DEFLATE_MIN_SIZE) {
+        return;
+    }
+
+    auto deflated = deflate_compress({ uncompressed.cbegin() + body_start, uncompressed.size() - body_start });
+
+    std::vector<u8> result;
+    result.reserve(uncompressed.size());
+
+    Encoder encoder(result);
+
+    result.insert(result.end(), uncompressed.cbegin(), uncompressed.cbegin() + 8);
+    result.push_back(BLOCK_TYPE_DEFLATE);
+    encoder.encode(deflated.size());
+    vector_extend(result, std::move(deflated));
+
+    isCompressed = true;
+    compressed = std::move(result);
+}
+
+/////////////////////////////////////////////////////////
+
 bool OldChange::operator==(const OldChange& other) const {
     return (operations == other.operations) &&
         (actor_id == other.actor_id) &&

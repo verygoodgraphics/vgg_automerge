@@ -57,6 +57,6 @@ u64 get_random_64();
 
 bool bin_slice_cmp(const BinSlice& a, const BinSlice& b);
 
-std::vector<u8> deflate_compress(const std::vector<u8>& data);
+std::vector<u8> deflate_compress(const BinSlice& data);
 
 std::vector<u8> deflate_decompress(const BinSlice& data);
