@@ -94,12 +94,6 @@ struct Clock {
         }
     }
 
-    void merge(const Clock& other) {
-        for (auto& [actor, data] : other.clock) {
-            include(actor, data);
-        }
-    }
-
 private:
     bool is_greater(const Clock& other) const {
         bool has_greater = false;

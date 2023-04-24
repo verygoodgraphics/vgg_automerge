@@ -267,7 +267,7 @@ void Automerge::apply_changes_with(std::vector<Change>&& changes, OpObserver* op
         }
     }
 
-    // TODO: optimize
+    // TODO: optimize to_json
     json_doc = *this;
 }
 
@@ -381,26 +381,52 @@ std::vector<u8> Automerge::save() {
     return bytes;
 }
 
-void Automerge::filter_changes(const std::vector<ChangeHash>& heads, std::set<ChangeHash>& changes) const {
-    std::vector<ChangeHash> h;
-    for (auto& hash : heads) {
+void Automerge::filter_changes(const std::vector<ChangeHash>& _heads, std::set<ChangeHash>& changes) const {
+    std::vector<ChangeHash> heads;
+    for (auto& hash : _heads) {
         if (histroy_index.count(hash)) {
-            h.push_back(hash);
+            heads.push_back(hash);
         }
     }
 
-    // TODO: change_graph
-
-    return;
+    change_graph.remove_ancestors(changes, heads);
 }
 
 std::vector<ChangeHash> Automerge::get_missing_deps(const std::vector<ChangeHash>& heads) const {
-    // TODO: get_missing_deps
+    std::unordered_set<ChangeHash> in_queue;
+    for (auto& change : queue) {
+        in_queue.insert(change.hash);
+    }
 
-    return {};
+    // TODO: optimise, use pointer in set
+    std::unordered_set<ChangeHash> missing;
+
+    for (auto& change : queue) {
+        for (auto& head : change.deps) {
+            if (!histroy_index.count(head)) {
+                missing.insert(head);
+            }
+        }
+    }
+
+    for (auto& head : heads) {
+        if (!histroy_index.count(head)) {
+            missing.insert(head);
+        }
+    }
+
+    std::vector<ChangeHash> missing_deps;
+    for (auto& hash : missing) {
+        if (!in_queue.count(hash)) {
+            missing_deps.push_back(hash);
+        }
+    }
+    std::sort(missing_deps.begin(), missing_deps.end());
+
+    return missing_deps;
 }
 
-// TODO: update clock related API
+// Get the changes since `have_deps` in this document using a clock internally.
 std::vector<const Change*> Automerge::get_changes_clock(const std::vector<ChangeHash>& have_deps) const {
     // get the clock for the given deps
     auto clock = clock_at(have_deps);
@@ -434,25 +460,7 @@ std::vector<const Change*> Automerge::get_changes_clock(const std::vector<Change
 }
 
 Clock Automerge::clock_at(const std::vector<ChangeHash>& heads) const {
-    Clock clock;
-    bool first = true;
-
-    for (auto& hash : heads) {
-        try {
-            if (first) {
-                clock = clocks.at(hash);
-                first = false;
-            }
-            else {
-                clock.merge(clocks.at(hash));
-            }
-        }
-        catch (std::out_of_range) {
-            throw AutomergeError{ AutomergeError::MissingHash, hash };
-        }
-    }
-
-    return clock;
+    return change_graph.clock_for_heads(heads);
 }
 
 std::optional<const Change*> Automerge::get_change_by_hash(const ChangeHash& hash) const {
@@ -530,20 +538,9 @@ usize Automerge::update_history(Change&& change, usize num_pos) {
     usize actor_index = ops.m.actors.cache(ActorId(change.actor_id()));
     states[actor_index].push_back(histroy_index);
 
-    Clock clock;
-    for (auto& hash : change.deps) {
-        try {
-            auto& c = clocks.at(hash);
-            clock.merge(c);
-        }
-        catch (std::out_of_range) {
-            throw std::runtime_error("Change's deps should already be in the document");
-        }
-    }
-    clock.include(actor_index, ClockData{ change.max_op(), change.seq });
-    clocks.insert({ change.hash, clock });
-
     this->histroy_index.insert({ change.hash, histroy_index });
+    change_graph.add_change(change, actor_index);
+
     histroy.push_back(std::move(change));
 
     return histroy_index;

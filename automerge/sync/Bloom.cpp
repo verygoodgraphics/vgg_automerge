@@ -1,3 +1,6 @@
+// Copyright (c) 2022 the VGG Automerge contributors
+// This code is licensed under MIT license (see LICENSE for details)
+
 #include <cmath>
 #include "Bloom.h"
 #include "../Decoder.h"

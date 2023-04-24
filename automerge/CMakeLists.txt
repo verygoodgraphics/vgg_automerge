@@ -29,6 +29,8 @@ add_library (automerge STATIC
 	"query/SeekOpWithPatch.cpp"
 	"OpObserver.h"
 	"Clock.h"
+	"ChangeGraph.h"
+	"ChangeGraph.cpp"
 	"Error.h"
 	"transaction/Transactable.h"
 	"query/Nth.h"

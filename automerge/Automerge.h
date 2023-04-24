@@ -16,7 +16,7 @@
 #include "OpSet.h"
 #include "Keys.h"
 #include "transaction/Transaction.h"
-#include "Clock.h"
+#include "ChangeGraph.h"
 #include "transaction/CommitOptions.h"
 #include "Sync.h"
 #include "Error.h"
@@ -35,18 +35,28 @@ typedef std::function<std::vector<ExId>(Transaction&)> TransactionFunc;
 typedef std::function<CommitOptions<OpObserver>(const std::vector<ExId>&)> CommitOptionsFunc;
 
 struct Automerge {
+    // The list of unapplied changes that are not causally ready.
     std::vector<Change> queue;
+    // The history of changes that form this document, topologically sorted too.
     std::vector<Change> histroy;
+    // Mapping from change hash to index into the history list.
     std::unordered_map<ChangeHash, usize> histroy_index;
-    std::unordered_map<ChangeHash, Clock> clocks;
+    // Graph of changes
+    ChangeGraph change_graph;
+    // Mapping from actor index to list of seqs seen for them.
     std::unordered_map<usize, VecPos> states;
+    // Current dependencies of this document (heads hashes).
     std::unordered_set<ChangeHash> deps;
+    // Heads at the last save.
     std::vector<ChangeHash> saved;
+    // The set of operations that form this document.
     OpSet ops;
+    // The current actor.
     Actor actor;
+    // The maximum operation counter this document has seen.
     u64 max_op;
 
-    Automerge() : queue(), histroy(), histroy_index(), clocks(), states(), deps(), saved(), ops(),
+    Automerge() : queue(), histroy(), histroy_index(), change_graph(), states(), deps(), saved(), ops(),
         actor{ false, ActorId(true), 0 }, max_op(0) {}
 
     // Set the actor id for this document.
