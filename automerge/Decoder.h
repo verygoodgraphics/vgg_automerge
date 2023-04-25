@@ -87,8 +87,8 @@ private:
 
 struct Decoder {
 public:
-    usize offset;
-    usize last_read;
+    usize offset = 0;
+    usize last_read = 0;
 
     Decoder() = default;
     Decoder(std::vector<u8>&& data) : offset(0), last_read(0),
@@ -156,8 +156,8 @@ template<class T>
 struct RleDecoder {
     Decoder decoder;
     std::optional<T> last_value;
-    s64 count;
-    bool _literal;
+    s64 count = 0;
+    bool _literal = false;
 
     RleDecoder() = default;
     RleDecoder(std::vector<u8>&& data) : decoder(std::move(data)), last_value{}, count(0), _literal(false) {}

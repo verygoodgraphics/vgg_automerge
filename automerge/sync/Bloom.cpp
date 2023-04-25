@@ -6,7 +6,7 @@
 #include "../Decoder.h"
 
 BloomFilter::BloomFilter(std::vector<const ChangeHash*>&& hashes) {
-    num_entries = hashes.size();
+    num_entries = (u32)hashes.size();
     num_bits_per_entry = BITS_PER_ENTRY;
     num_probes = NUM_PROBES;
     bits.reserve(bits_capacity(num_entries, num_bits_per_entry));
@@ -53,7 +53,7 @@ std::optional<BloomFilter> BloomFilter::decode(const BinSlice& bytes) {
 
 usize BloomFilter::bits_capacity(u32 num_entries, u32 num_bits_per_entry) {
     double f = 1.0 * num_entries * num_bits_per_entry / 8;
-    return std::ceil(f);
+    return (usize)std::ceil(f);
 }
 
 std::vector<u8> BloomFilter::to_bytes() const {
@@ -72,7 +72,7 @@ std::vector<u8> BloomFilter::to_bytes() const {
 
 std::vector<u32> BloomFilter::get_probes(const ChangeHash& hash) const {
     const u8* hash_bytes = hash.data;
-    u32 modulo = 8 * bits.size();
+    u32 modulo = 8 * (u32)bits.size();
 
     auto bytes_to_u32 = [&](u32 offset) -> u32 {
         auto start = hash_bytes + offset;
@@ -98,7 +98,7 @@ std::vector<u32> BloomFilter::get_probes(const ChangeHash& hash) const {
     std::vector<u32> probes;
     probes.reserve(num_probes);
     probes.push_back(x);
-    for (int i = 1; i < num_probes; ++i) {
+    for (u32 i = 1; i < num_probes; ++i) {
         x = (x + y) % modulo;
         y = (y + z) % modulo;
         probes.push_back(x);
@@ -114,14 +114,14 @@ void BloomFilter::add_hash(const ChangeHash& hash) {
 }
 
 void BloomFilter::set_bit(usize probe) {
-    u32 index = probe >> 3;
+    auto index = probe >> 3;
     if (index < bits.size()) {
         bits[index] |= 1 << (probe & 7);
     }
 }
 
 std::optional<u8> BloomFilter::get_bit(usize probe) const {
-    u32 index = probe >> 3;
+    auto index = probe >> 3;
     if (index >= bits.size()) {
         return {};
     }

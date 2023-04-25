@@ -9,7 +9,7 @@
 
 // #[derive(Eq, PartialEq, Hash, Clone)]
 struct OldOpId {
-    u64 counter;
+    u64 counter = 0;
     ActorId actor;
 
     OldOpId() = default;

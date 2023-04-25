@@ -30,7 +30,7 @@ std::optional<ChangeHash> ChangeGraph::add_change(const Change& change, usize ac
 }
 
 u32 ChangeGraph::add_node(usize actor_index, const Change& change) {
-    u32 idx = nodes.size();
+    u32 idx = (u32)nodes.size();
     auto hash_idx = add_hash(ChangeHash(change.hash));
     nodes.push_back(ChangeNode{
         hash_idx,
@@ -44,14 +44,14 @@ u32 ChangeGraph::add_node(usize actor_index, const Change& change) {
 }
 
 u32 ChangeGraph::add_hash(ChangeHash&& hash) {
-    u32 idx = hashes.size();
+    u32 idx = (u32)hashes.size();
     hashes.push_back(hash);
 
     return idx;
 }
 
 void ChangeGraph::add_parent(u32 child_idx, u32 parent_idx) {
-    u32 new_edge_idx = edges.size();
+    u32 new_edge_idx = (u32)edges.size();
     edges.push_back({ parent_idx, {} });
 
     auto& child = nodes[child_idx];
