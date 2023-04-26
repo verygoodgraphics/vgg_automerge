@@ -14,10 +14,12 @@ else()
 	enable_testing()
 
 	add_executable(unit_test
-	  hello_test.cpp
+		"hello_test.cpp"
+		"automerge_test.cpp"
 	)
-	target_link_libraries(unit_test
-	  GTest::gtest_main
+	target_link_libraries(unit_test PRIVATE
+		automerge
+		GTest::gtest_main
 	)
 
 	include(GoogleTest)
