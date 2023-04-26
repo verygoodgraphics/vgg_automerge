@@ -9,4 +9,10 @@ add_subdirectory ("vgg_contrib/json")
 add_subdirectory ("vgg_contrib/picosha2")
 add_subdirectory ("vgg_contrib/sdefl")
 add_subdirectory ("automerge")
-add_subdirectory ("test")
+
+# add test targets
+include(CTest)
+if (BUILD_TESTING)
+    enable_testing()
+    add_subdirectory("test")
+endif()
