@@ -26,15 +26,11 @@ struct BloomFilter {
     BloomFilter() = default;
     BloomFilter(u32 num_entries, u32 num_bits_per_entry, u32 num_probes, std::vector<u8>&& bits) :
         num_entries(num_entries), num_bits_per_entry(num_bits_per_entry), num_probes(num_probes), bits(std::move(bits)) {}
-    // from_hashes
-    BloomFilter(std::vector<const ChangeHash*>&& hashes);
-
-    // try_from &[u8]
-    static std::optional<BloomFilter> decode(const BinSlice& bytes);
-
-    static usize bits_capacity(u32 num_entries, u32 num_bits_per_entry);
 
     std::vector<u8> to_bytes() const;
+
+    // try_from &[u8]
+    static std::optional<BloomFilter> parse(const BinSlice& bytes);
 
     std::vector<u32> get_probes(const ChangeHash& hash) const;
 
@@ -45,4 +41,9 @@ struct BloomFilter {
     std::optional<u8> get_bit(usize probe) const;
 
     bool contains_hash(const ChangeHash& hash) const;
+
+    // from_hashes
+    BloomFilter(std::vector<const ChangeHash*>&& hashes);
+
+    static usize bits_capacity(u32 num_entries, u32 num_bits_per_entry);
 };

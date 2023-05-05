@@ -5,24 +5,27 @@
 #include "Bloom.h"
 #include "../Decoder.h"
 
-BloomFilter::BloomFilter(std::vector<const ChangeHash*>&& hashes) {
-    num_entries = (u32)hashes.size();
-    num_bits_per_entry = BITS_PER_ENTRY;
-    num_probes = NUM_PROBES;
-    bits.reserve(bits_capacity(num_entries, num_bits_per_entry));
+std::vector<u8> BloomFilter::to_bytes() const {
+    std::vector<u8> buf;
+    Encoder encoder(buf);
 
-    for (auto hash : hashes) {
-        add_hash(*hash);
+    if (num_entries != 0) {
+        encoder.encode(num_entries);
+        encoder.encode(num_bits_per_entry);
+        encoder.encode(num_probes);
+        vector_extend(buf, bits);
     }
+
+    return buf;
 }
 
-std::optional<BloomFilter> BloomFilter::decode(const BinSlice& bytes) {
+std::optional<BloomFilter> BloomFilter::parse(const BinSlice& bytes) {
     if (bytes.second == 0) {
         return BloomFilter();
     }
 
     Decoder decoder(bytes);
-    
+
     auto num_entries = decoder.read<u32>();
     if (!num_entries) {
         return {};
@@ -49,25 +52,6 @@ std::optional<BloomFilter> BloomFilter::decode(const BinSlice& bytes) {
         *num_probes,
         std::vector<u8>(bits->first, bits->first + bits->second)
     );
-}
-
-usize BloomFilter::bits_capacity(u32 num_entries, u32 num_bits_per_entry) {
-    double f = 1.0 * num_entries * num_bits_per_entry / 8;
-    return (usize)std::ceil(f);
-}
-
-std::vector<u8> BloomFilter::to_bytes() const {
-    std::vector<u8> buf;
-    Encoder encoder(buf);
-
-    if (num_entries != 0) {
-        encoder.encode(num_entries);
-        encoder.encode(num_bits_per_entry);
-        encoder.encode(num_probes);
-        vector_extend(buf, bits);
-    }
-
-    return buf;
 }
 
 std::vector<u32> BloomFilter::get_probes(const ChangeHash& hash) const {
@@ -142,4 +126,20 @@ bool BloomFilter::contains_hash(const ChangeHash& hash) const {
     }
 
     return true;
+}
+
+BloomFilter::BloomFilter(std::vector<const ChangeHash*>&& hashes) {
+    num_entries = (u32)hashes.size();
+    num_bits_per_entry = BITS_PER_ENTRY;
+    num_probes = NUM_PROBES;
+    bits = std::vector<u8>(bits_capacity(num_entries, num_bits_per_entry), 0);
+
+    for (auto hash : hashes) {
+        add_hash(*hash);
+    }
+}
+
+usize BloomFilter::bits_capacity(u32 num_entries, u32 num_bits_per_entry) {
+    double f = 1.0 * num_entries * num_bits_per_entry / 8;
+    return (usize)std::ceil(f);
 }

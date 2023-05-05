@@ -28,7 +28,7 @@ struct SyncMessage {
 
     std::vector<u8> encode();
 
-    std::optional<SyncMessage> decode(const BinSlice& bytes);
+    static std::optional<SyncMessage> decode(const BinSlice& bytes);
 };
 
 std::vector<ChangeHash> advance_heads(

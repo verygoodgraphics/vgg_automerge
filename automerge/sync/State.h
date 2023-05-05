@@ -53,7 +53,7 @@ struct State{
     // `in_flight` is `false` then `generate_sync_message` will return a new message (provided
     // there are in fact changes to send). If it is `true` then we don't. This flag is cleared
     // in `receive_sync_message`.
-    bool in_flight;
+    bool in_flight = false;
 
     std::vector<u8> encode() const;
     static std::optional<State> decode(const BinSlice& bytes);

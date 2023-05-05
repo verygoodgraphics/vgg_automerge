@@ -40,6 +40,7 @@ struct ChangeHash {
     ChangeHash() = default;
     ChangeHash(const std::vector<u8>& vec);
     ChangeHash(const BinSlice& bin);
+    ChangeHash(const std::string& hex_str);
 
     bool operator==(const ChangeHash& other) const {
         return (cmp(other) == 0);
@@ -49,15 +50,9 @@ struct ChangeHash {
         return (cmp(other) < 0);
     }
 
-    int cmp(const ChangeHash& other) const {
-        for (int i = HASH_SIZE - 1; i >= 0; --i) {
-            if (data[i] < other.data[i])
-                return -1;
-            if (data[i] > other.data[i])
-                return 1;
-        }
-        return 0;
-    }
+    int cmp(const ChangeHash& other) const;
+
+    std::string to_hex() const;
 };
 template<>
 struct std::hash<ChangeHash> {
@@ -70,14 +65,18 @@ struct std::hash<ChangeHash> {
     }
 };
 
+// The number of bytes in an actor id.
+constexpr usize ACTOR_ID_SIZE = 16;
+
 // #[derive(Eq, PartialEq, Hash, Clone, PartialOrd, Ord)]
 struct ActorId {
     // little endian
-    u8 data[16] = { 0 };
+    u8 data[ACTOR_ID_SIZE] = { 0 };
 
     ActorId(bool random = false);
     ActorId(const std::vector<u8>& slice);
     ActorId(const BinSlice& slice);
+    ActorId(const std::string& hex_str);
 
     bool operator==(const ActorId& other) const {
         return (cmp(other) == 0);
@@ -87,24 +86,11 @@ struct ActorId {
         return (cmp(other) < 0);
     }
 
-    int cmp(const ActorId& other) const {
-        for (int i = 15; i >= 0; --i) {
-            if (data[i] < other.data[i])
-                return -1;
-            if (data[i] > other.data[i])
-                return 1;
-        }
-        return 0;
-    }
+    int cmp(const ActorId& other) const;
 
-    usize actor_index(const std::vector<ActorId>& actors) const {
-        for (auto iter = actors.cbegin(); iter != actors.cend(); ++iter) {
-            if (cmp(*iter) == 0) {
-                return iter - actors.cbegin();
-            }
-        }
-        throw std::runtime_error("actor not found");
-    }
+    usize actor_index(const std::vector<ActorId>& actors) const;
+
+    std::string to_hex() const;
 
     friend std::ostream& operator<<(std::ostream& out, const ActorId& actorId);
 };

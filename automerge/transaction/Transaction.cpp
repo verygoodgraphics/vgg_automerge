@@ -50,12 +50,55 @@ Change TransactionInner::export_change(const IndexedCache<ActorId>& actors, cons
 }
 
 void TransactionInner::put(Automerge& doc, const ExId& ex_obj, Prop&& prop, ScalarValue&& value) {
-    ObjId obj = doc.exid_to_obj(ex_obj);
+    auto [obj, obj_type] = doc.exid_to_obj(ex_obj);
+
+    bool valid = false;
+    switch (obj_type) {
+    case ObjType::Map:
+        if (prop.tag == Prop::Map) {
+            valid = true;
+        }
+        break;
+    case ObjType::List:
+    case ObjType::Text:
+        if (prop.tag == Prop::Seq) {
+            valid = true;
+        }
+        break;
+    default:
+        break;
+    }
+
+    if (!valid) {
+        throw std::runtime_error("InvalidOp_" + std::to_string((int)obj_type));
+    }
+
     local_op(doc, obj, std::move(prop), OpType{ OpType::Put, std::move(value) });
 }
 
 ExId TransactionInner::put_object(Automerge& doc, const ExId& ex_obj, Prop&& prop, ObjType value) {
-    ObjId obj = doc.exid_to_obj(ex_obj);
+    auto [obj, obj_type] = doc.exid_to_obj(ex_obj);
+
+    bool valid = false;
+    switch (obj_type) {
+    case ObjType::Map:
+        if (prop.tag == Prop::Map) {
+            valid = true;
+        }
+        break;
+    case ObjType::List:
+        if (prop.tag == Prop::Seq) {
+            valid = true;
+        }
+        break;
+    default:
+        break;
+    }
+
+    if (!valid) {
+        throw std::runtime_error("InvalidOp_" + std::to_string((int)obj_type));
+    }
+
     OpId id = *local_op(doc, obj, std::move(prop), OpType{ OpType::Make, value });
 
     return doc.id_to_exid(id);
@@ -72,12 +115,22 @@ void TransactionInner::insert_local_op(Automerge& doc, Prop&& prop, Op&& op, usi
 }
 
 void TransactionInner::insert(Automerge& doc, const ExId& ex_obj, usize index, ScalarValue&& value) {
-    ObjId obj = doc.exid_to_obj(ex_obj);
+    auto [obj, obj_type] = doc.exid_to_obj(ex_obj);
+
+    if (!(obj_type == ObjType::List || obj_type == ObjType::Text)) {
+        throw std::runtime_error("InvalidOp_" + std::to_string((int)obj_type));
+    }
+
     do_insert(doc, obj, index, OpType{ OpType::Put, std::move(value) });
 }
 
 ExId TransactionInner::insert_object(Automerge& doc, const ExId& ex_obj, usize index, ObjType value) {
-    ObjId obj = doc.exid_to_obj(ex_obj);
+    auto [obj, obj_type] = doc.exid_to_obj(ex_obj);
+
+    if (!(obj_type == ObjType::List || obj_type == ObjType::Text)) {
+        throw std::runtime_error("InvalidOp_" + std::to_string((int)obj_type));
+    }
+
     OpId id = do_insert(doc, obj, index, OpType{ OpType::Make, value });
     return doc.id_to_exid(id);
 }
@@ -216,7 +269,10 @@ std::optional<OpId> TransactionInner::local_list_op(Automerge& doc, ObjId& obj, 
 }
 
 void TransactionInner::delete_(Automerge& doc, const ExId& ex_obj, Prop&& prop) {
-    auto obj = doc.exid_to_obj(ex_obj);
+    auto [obj, obj_type] = doc.exid_to_obj(ex_obj);
+
+    // TODO: text
+
     local_op(doc, obj, std::move(prop), OpType{ OpType::Delete, {} });
 }
 

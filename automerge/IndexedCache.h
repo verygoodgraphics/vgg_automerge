@@ -22,6 +22,8 @@ public:
     IndexedCache() = default;
     IndexedCache(const IndexedCache&) = default;
     IndexedCache(IndexedCache&&) = default;
+    IndexedCache& operator=(const IndexedCache&) = default;
+    IndexedCache& operator=(IndexedCache&&) = default;
 
     IndexedCache(const std::vector<T>& other_cache) : _cache(other_cache) {}
 

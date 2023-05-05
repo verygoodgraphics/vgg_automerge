@@ -69,7 +69,7 @@ std::optional<SyncMessage> SyncMessage::decode(const BinSlice& bytes) {
             return {};
         }
 
-        auto bloom = BloomFilter::decode(BinSlice(bloom_bytes->cbegin(), bloom_bytes->size()));
+        auto bloom = BloomFilter::parse(BinSlice(bloom_bytes->cbegin(), bloom_bytes->size()));
         if (!bloom) {
             return {};
         }

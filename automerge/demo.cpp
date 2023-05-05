@@ -83,6 +83,27 @@ Automerge quickstart() {
     return doc3;
 }
 
+void direct_edit_test() {
+    auto doc = Automerge();
+    doc.put_object(doc.import_object("/").first, Prop("todo"),
+        R"([{"title": "work A", "done": false}, {"title": "work B", "done": true}])");
+
+    doc.commit();
+
+    assert(json(doc) == json::parse(R"({
+    "todo": [
+        {
+            "title": "work A",
+            "done": false
+        },
+        {
+            "title": "work B",
+            "done": true
+        }
+    ]
+})"));
+}
+
 void json_demo() {
     json json_obj = json::parse(R"({
     "todo": [
@@ -146,6 +167,7 @@ void json_test(const Automerge& doc) {
     doc1.json_replace("/cards/0/done"_json_pointer, true);
     // json_replace2, scalar to object
     doc1.json_replace("/cards/2/title"_json_pointer, { nullptr, { "test", "ok"}, 1.5, {{"n1", -4}, {"n2", {{"tmp", 9}}}} });
+    doc1.commit();
 
     assert(json(doc1) == json::parse(R"({
     "cards": [
@@ -175,6 +197,7 @@ void json_test(const Automerge& doc) {
     doc1.json_replace("/cards/2/title/3/n2"_json_pointer, false);
     // json_replace4, object to object
     doc1.json_replace("/cards/2/title/1"_json_pointer, { { "test", -9} });
+    doc1.commit();
 
     assert(json(doc1) == json::parse(R"({
     "cards": [
@@ -245,13 +268,19 @@ void hex_string_test() {
 
 int main()
 {
+    std::cout << "demo\n";
+
     auto doc = quickstart();
+
+    direct_edit_test();
 
     json_demo();
 
     json_test(doc);
 
     hex_string_test();
+
+    std::cout << "passed" << std::endl;
 
     return 0;
 }

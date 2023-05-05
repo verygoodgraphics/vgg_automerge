@@ -5,9 +5,11 @@
 
 #include <string>
 #include <vector>
+#include <list>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+#include <optional>
 #include <algorithm>
 
 #include "type.h"
@@ -130,10 +132,15 @@ struct Automerge {
     usize length_at(const ExId& obj, const std::vector<ChangeHash>& heads) const;
 
     // Get the type of this object, if it is an object.
-    //std::optional<ObjType> object_type() {}
+    // throw AutomergeError
+    ObjType object_type(const ExId& obj) const {
+        auto [_, obj_type] = exid_to_obj(obj);
+
+        return obj_type;
+    }
 
     // throw AutomergeError
-    ObjId exid_to_obj(const ExId& id) const;
+    std::pair<ObjId, ObjType> exid_to_obj(const ExId& id) const;
 
     ExId id_to_exid(const OpId& id) const;
 
@@ -171,7 +178,9 @@ struct Automerge {
 
     // Apply changes to this document.
     // throw AutomergeError
-    //void apply_changes() {}
+    void apply_changes(std::vector<Change>&& changes) {
+        apply_changes_with(std::move(changes), nullptr);
+    }
 
     // Apply changes to this document.
     // throw AutomergeError
@@ -185,11 +194,11 @@ struct Automerge {
 
     std::vector<std::pair<ObjId, Op>> imports_ops(const Change& change);
 
-    std::vector<ChangeHash> merge(const Automerge& other);
+    std::vector<ChangeHash> merge(Automerge& other);
 
     std::vector<ChangeHash> merge(Automerge&& other);
 
-    std::vector<ChangeHash> merge_with(const Automerge& other, OpObserver* options);
+    std::vector<ChangeHash> merge_with(Automerge& other, OpObserver* options);
 
     std::vector<u8> save();
 
@@ -213,7 +222,8 @@ struct Automerge {
         return get_changes_clock(have_deps);
     }
 
-    // get_last_local_change
+    // Get the last change this actor made to the document.
+    std::optional<Change> get_last_local_change() const;
 
     // throw AutomergeError
     Clock clock_at(const std::vector<ChangeHash>& heads) const;
@@ -233,7 +243,13 @@ struct Automerge {
 
     void update_deps(const Change& change);
 
-    // import
+    // automerge.rs: import
+    // throw AutomergeError
+    std::pair<ExId, ObjType> import(const std::string_view& str) const;
+
+    // interop.rs: import
+    // throw AutomergeError
+    std::pair<ExId, ObjType> import_object(const std::string& obj_str) const;
 
     std::string to_string(Export&& id) const;
 
@@ -257,6 +273,52 @@ struct Automerge {
 
     // throw
     std::vector<const Change*> get_changes_to_send(const std::vector<Have>& have, const std::vector<ChangeHash>& need) const;
+
+    // lib.rs: put
+    // throw AutomergeError
+    void put(const ExId& obj, Prop&& prop, ScalarValue&& value) {
+        ensure_transaction_open();
+
+        _transaction->put(obj, std::move(prop), std::move(value));
+    }
+
+    // lib.rs: put_object
+    // throw AutomergeError
+    ExId put_object(const ExId& obj, Prop&& prop, const std::string& value_str);
+
+    // lib.rs: insert
+    // throw AutomergeError
+    void insert(const ExId& obj, usize index, ScalarValue&& value) {
+        ensure_transaction_open();
+
+        _transaction->insert(obj, index, std::move(value));
+    }
+
+    // lib.rs: insert_object
+    // throw AutomergeError
+    ExId insert_object(const ExId& obj, usize index, const std::string& value_str);
+
+    // lib.rs: delete
+    // throw AutomergeError
+    void delete_(const ExId& obj, Prop&& prop) {
+        ensure_transaction_open();
+
+        _transaction->delete_(obj, std::move(prop));
+    }
+
+    //// throw AutomergeError
+    //ExId put_object(const ExId& obj, Prop&& prop, ObjType value) {
+    //    ensure_transaction_open();
+
+    //    return _transaction->put_object(obj, std::move(prop), value);
+    //}
+
+    //// throw AutomergeError
+    //ExId insert_object(const ExId& obj, usize index, ObjType value) {
+    //    ensure_transaction_open();
+
+    //    return _transaction->insert_object(obj, index, value);
+    //}
 
     /*!
     @brief add a new item with a new path, the parent path should exist
@@ -321,7 +383,15 @@ private:
         }
     }
 
-    JsonPathParsed json_pointer_parse(const json::json_pointer& path);
+    ExId json_adding(const PropPair& item, std::pair<Value, std::list<std::pair<Prop, json>>>&& value);
+    ExId json_replacing(const PropPair& item, std::pair<Value, std::list<std::pair<Prop, json>>>&& value);
+
+    // interop.rs: import_path
+    JsonPathParsed json_pointer_parse(ExId&& prefix_id, ObjType prefix_type, const json::json_pointer& path) const;
+
+    // interop.rs: import_path
+    // throw AutomergeError
+    std::pair<ExId, ObjType> import_path(ExId&& prefix_id, ObjType prefix_type, const std::string_view& obj_str) const;
 };
 
 void to_json(json& j, const Automerge& doc);

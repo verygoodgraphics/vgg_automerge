@@ -43,7 +43,9 @@ struct OpIds {
     OpIds() = default;
     OpIds(std::vector<OpId>&& opids) : v(std::move(opids)) {}
     OpIds(std::vector<OpId>&& opids, OpIdCmpFunc cmp) : v(std::move(opids)) {
-        std::stable_sort(v.begin(), v.end(), cmp);
+        std::stable_sort(v.begin(), v.end(), [&](const OpId& left, const OpId& right) {
+            return cmp(left, right) < 0;
+            });
     }
 
     // Create a new OpIds if `opids` are sorted with respect to `cmp` and contain no duplicates.

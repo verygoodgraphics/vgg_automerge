@@ -9,7 +9,7 @@
 
 ChangeHash::ChangeHash(const std::vector<u8>& vec) {
     if (vec.size() != HASH_SIZE) {
-        throw std::runtime_error("invalid change hash slice");
+        throw std::runtime_error("invalid change hash vector");
     }
 
     std::copy(vec.cbegin(), vec.cend(), data);
@@ -21,6 +21,29 @@ ChangeHash::ChangeHash(const BinSlice& bin) {
     }
 
     std::copy(bin.first, bin.first + bin.second, data);
+}
+
+ChangeHash::ChangeHash(const std::string& hex_str) {
+    if (hex_str.length() != HASH_SIZE * 2) {
+        throw std::runtime_error("invalid change hash string");
+    }
+
+    auto vec = hex_from_string(hex_str);
+    std::copy(vec.cbegin(), vec.cend(), data);
+}
+
+int ChangeHash::cmp(const ChangeHash& other) const {
+    for (usize i = 0; i < HASH_SIZE; ++i) {
+        if (data[i] < other.data[i])
+            return -1;
+        if (data[i] > other.data[i])
+            return 1;
+    }
+    return 0;
+}
+
+std::string ChangeHash::to_hex() const {
+    return hex_to_string<const u8*>({ std::cbegin(data), HASH_SIZE });
 }
 
 ActorId::ActorId(bool random) {
@@ -50,7 +73,7 @@ ActorId::ActorId(bool random) {
 }
 
 ActorId::ActorId(const std::vector<u8>& slice) {
-    for (int i = 0; i < 16; ++i) {
+    for (usize i = 0; i < ACTOR_ID_SIZE; ++i) {
         if (i >= slice.size()) {
             break;
         }
@@ -60,7 +83,7 @@ ActorId::ActorId(const std::vector<u8>& slice) {
 }
 
 ActorId::ActorId(const BinSlice& slice) {
-    for (int i = 0; i < 16; ++i) {
+    for (usize i = 0; i < ACTOR_ID_SIZE; ++i) {
         if (i >= slice.second) {
             break;
         }
@@ -69,10 +92,46 @@ ActorId::ActorId(const BinSlice& slice) {
     }
 }
 
+ActorId::ActorId(const std::string& hex_str) {
+    if (hex_str.length() % 2) {
+        throw std::runtime_error("invalid actor id string");
+    }
+
+    auto vec = hex_from_string(hex_str);
+    std::copy(
+        vec.cbegin(),
+        (vec.size() > ACTOR_ID_SIZE) ? vec.cbegin() + ACTOR_ID_SIZE : vec.cend(),
+        data
+    );
+}
+
+int ActorId::cmp(const ActorId& other) const {
+    for (usize i = 0; i < ACTOR_ID_SIZE; ++i) {
+        if (data[i] < other.data[i])
+            return -1;
+        if (data[i] > other.data[i])
+            return 1;
+    }
+    return 0;
+}
+
+usize ActorId::actor_index(const std::vector<ActorId>& actors) const {
+    for (auto iter = actors.cbegin(); iter != actors.cend(); ++iter) {
+        if (cmp(*iter) == 0) {
+            return iter - actors.cbegin();
+        }
+    }
+    throw std::runtime_error("actor not found");
+}
+
+std::string ActorId::to_hex() const {
+    return hex_to_string<const u8*>({ std::cbegin(data), ACTOR_ID_SIZE });
+}
+
 std::ostream& operator<<(std::ostream& out, const ActorId& actorId) {
-    for (u8 i = 0; i < 16; ++i) {
+    for (u8 i = 0; i < ACTOR_ID_SIZE; ++i) {
         // type of actorId.data[] is u8, treated as a character, should convert to int
-        out << std::setw(2) << std::setfill('0') << std::hex << (u16)actorId.data[15 - i];
+        out << std::setw(2) << std::setfill('0') << std::hex << (u16)actorId.data[i];
     }
 
     return out;

@@ -43,6 +43,17 @@ struct ExId {
 
         return 1;
     }
+
+    std::string to_string() const {
+        if (isRoot) {
+            return "_root";
+        }
+
+        std::string str = std::to_string(std::get<0>(id)) + '@';
+        str.append(std::get<1>(id).to_hex());
+
+        return str;
+    }
 };
 
 typedef std::pair<ExId, Prop> PropPair;
@@ -52,7 +63,7 @@ typedef std::pair<ExId, s64> S64Pair;
 
 struct JsonPathParsed {
     enum {
-        // path and its parent are not found
+        // not a valid path: its parent isn't found or isn't an object
         // variant: std::string(the root path which not found or not an object)
         Invalid,
         // path is not found, its parent is found

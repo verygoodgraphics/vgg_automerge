@@ -36,14 +36,14 @@ struct OpTreeNodeIter {
 
 // combine OpTreeIter and Inner of op_tree/iter.rs
 struct OpTreeIter {
-    bool is_emtpy;
+    bool is_emtpy = false;
 
     // A stack of nodes in the optree which we have descended in to to get to the current element.
     std::vector<OpTreeNodeIter> ancestors;
     OpTreeNodeIter current;
     // How far through the whole optree we are
-    usize cumulative_index;
-    const OpTreeNode* root_node;
+    usize cumulative_index = 0;
+    const OpTreeNode* root_node = nullptr;
 
     OpTreeIter(const OpTreeInternal& tree);
 
