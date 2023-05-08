@@ -88,7 +88,15 @@ struct Automerge {
     // Like [`Self::transact`] but with a function for generating the commit options.
     std::pair<std::vector<ExId>, ChangeHash> transact_with(CommitOptionsFunc c, TransactionFunc f);
 
-    //Automerge fork() {}
+
+    // Fork this document at the current point for use by a different actor.
+    // This will create a new actor ID for the forked document
+    Automerge fork() const {
+        Automerge f = *this;
+        f.set_actor(ActorId(true));
+
+        return f;
+    }
 
     // throw AutomergeError
     //Automerge fork_at() {}
@@ -274,7 +282,7 @@ struct Automerge {
     // throw
     std::vector<const Change*> get_changes_to_send(const std::vector<Have>& have, const std::vector<ChangeHash>& need) const;
 
-    // lib.rs: put
+    // autocommit.rs, wasm/lib.rs: put
     // throw AutomergeError
     void put(const ExId& obj, Prop&& prop, ScalarValue&& value) {
         ensure_transaction_open();
@@ -282,11 +290,19 @@ struct Automerge {
         _transaction->put(obj, std::move(prop), std::move(value));
     }
 
-    // lib.rs: put_object
+    // autocommit.rs: put_object
+    // throw AutomergeError
+    ExId put_object(const ExId& obj, Prop&& prop, ObjType value) {
+        ensure_transaction_open();
+
+        return _transaction->put_object(obj, std::move(prop), value);
+    }
+
+    // wasm/lib.rs: put_object
     // throw AutomergeError
     ExId put_object(const ExId& obj, Prop&& prop, const std::string& value_str);
 
-    // lib.rs: insert
+    // autocommit.rs, wasm/lib.rs: insert
     // throw AutomergeError
     void insert(const ExId& obj, usize index, ScalarValue&& value) {
         ensure_transaction_open();
@@ -294,31 +310,25 @@ struct Automerge {
         _transaction->insert(obj, index, std::move(value));
     }
 
-    // lib.rs: insert_object
+    // autocommit.rs: insert_object
+    // throw AutomergeError
+    ExId insert_object(const ExId& obj, usize index, ObjType value) {
+        ensure_transaction_open();
+
+        return _transaction->insert_object(obj, index, value);
+    }
+
+    // wasm/lib.rs: insert_object
     // throw AutomergeError
     ExId insert_object(const ExId& obj, usize index, const std::string& value_str);
 
-    // lib.rs: delete
+    // autocommit.rs, wasm/lib.rs: delete
     // throw AutomergeError
     void delete_(const ExId& obj, Prop&& prop) {
         ensure_transaction_open();
 
         _transaction->delete_(obj, std::move(prop));
     }
-
-    //// throw AutomergeError
-    //ExId put_object(const ExId& obj, Prop&& prop, ObjType value) {
-    //    ensure_transaction_open();
-
-    //    return _transaction->put_object(obj, std::move(prop), value);
-    //}
-
-    //// throw AutomergeError
-    //ExId insert_object(const ExId& obj, usize index, ObjType value) {
-    //    ensure_transaction_open();
-
-    //    return _transaction->insert_object(obj, index, value);
-    //}
 
     /*!
     @brief add a new item with a new path, the parent path should exist

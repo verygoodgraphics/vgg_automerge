@@ -295,6 +295,776 @@ TEST_F(AutomergeTest, HexString) {
     EXPECT_EQ(bin_vec, binary);
 }
 
+/////////////////////////////////////////////////////////
+// automerge/tests/test.rs
+/////////////////////////////////////////////////////////
+
+auto get_all_to_set(const Automerge& doc, const ExId& obj, Prop&& prop) {
+    std::unordered_multiset<std::string> set;
+
+    for (auto& vp : doc.get_all(obj, std::move(prop))) {
+        auto& value = vp.second;
+        if (value.tag == Value::OBJECT) {
+            auto& type = std::get<ObjType>(value.data);
+            if (type == ObjType::List) {
+                set.insert("o_list");
+            }
+            else {
+                set.insert("o_map");
+            }
+        }
+        else {
+            set.insert(std::get<ScalarValue>(value.data).to_string());
+        }
+    }
+
+    return set;
+}
+
+TEST_F(AutomergeTest, NoConflictOnRepeatedAssignment) {
+    Automerge doc;
+    doc.put(ExId(), Prop("foo"), ScalarValue{ ScalarValue::Int, (s64)1 });
+    doc.put(ExId(), Prop("foo"), ScalarValue{ ScalarValue::Int, (s64)2 });
+    doc.commit();
+
+    EXPECT_EQ(json::parse(R"({
+    "foo": 2
+})"), json(doc));
+}
+
+TEST_F(AutomergeTest, RepeatedMapAssignmentWhichResolvesConflictNotIgnored) {
+    Automerge doc1;
+    Automerge doc2;
+
+    doc1.put(ExId(), Prop("field"), ScalarValue{ ScalarValue::Int, (s64)123 });
+    doc1.commit();
+
+    doc2.merge(doc1);
+
+    doc2.put(ExId(), Prop("field"), ScalarValue{ ScalarValue::Int, (s64)456 });
+    doc2.commit();
+
+    doc1.put(ExId(), Prop("field"), ScalarValue{ ScalarValue::Int, (s64)789 });
+    doc1.commit();
+
+    doc1.merge(doc2);
+
+    EXPECT_EQ(2, doc1.get_all(ExId(), Prop("field")).size());
+
+    doc1.put(ExId(), Prop("field"), ScalarValue{ ScalarValue::Int, (s64)123 });
+    doc1.commit();
+
+    EXPECT_EQ(json::parse(R"({
+    "field": 123
+})"), json(doc1));
+}
+
+TEST_F(AutomergeTest, RepeatedListAssignmentWhichResolvesConflictNotIgnored) {
+    Automerge doc1;
+    Automerge doc2;
+
+    auto list_id = doc1.put_object(ExId(), Prop("list"), ObjType::List);
+
+    doc1.insert(list_id, 0, ScalarValue{ ScalarValue::Int, (s64)123 });
+    doc1.commit();
+
+    doc2.merge(doc1);
+
+    doc2.put(list_id, Prop(0), ScalarValue{ ScalarValue::Int, (s64)456 });
+    doc2.commit();
+
+    doc1.merge(doc2);
+
+    doc1.put(list_id, Prop(0), ScalarValue{ ScalarValue::Int, (s64)789 });
+    doc1.commit();
+
+    EXPECT_EQ(json::parse(R"({
+    "list": [ 789 ]
+})"), json(doc1));
+}
+
+TEST_F(AutomergeTest, ListDeletion) {
+    Automerge doc;
+    auto list_id = doc.put_object(ExId(), Prop("list"), ObjType::List);
+
+    doc.insert(list_id, 0, ScalarValue{ ScalarValue::Int, (s64)123 });
+    doc.insert(list_id, 1, ScalarValue{ ScalarValue::Int, (s64)456 });
+    doc.insert(list_id, 2, ScalarValue{ ScalarValue::Int, (s64)789 });
+    doc.delete_(list_id, Prop(1));
+    doc.commit();
+
+    EXPECT_EQ(json::parse(R"({
+    "list": [ 123, 789 ]
+})"), json(doc));
+}
+
+TEST_F(AutomergeTest, MergeConcurrentMapPropUpdates) {
+    Automerge doc1;
+    Automerge doc2;
+
+    doc1.put(ExId(), Prop("foo"), ScalarValue{ ScalarValue::Str, std::string("bar")});
+    doc1.commit();
+
+    doc2.put(ExId(), Prop("hello"), ScalarValue{ ScalarValue::Str, std::string("world") });
+    doc2.commit();
+
+    doc1.merge(doc2);
+
+    EXPECT_EQ((ScalarValue{ ScalarValue::Str, std::string("bar") }),
+        std::get<ScalarValue>(doc1.get(ExId(), Prop("foo"))->second.data));
+
+    EXPECT_EQ(json::parse(R"({
+    "foo": "bar",
+    "hello": "world"
+})"), json(doc1));
+
+    doc2.merge(doc1);
+
+    EXPECT_EQ(json::parse(R"({
+    "foo": "bar",
+    "hello": "world"
+})"), json(doc2));
+}
+
+// increment not implement
+//TEST_F(AutomergeTest, AddConcurrentIncrementsOfSameProperty) {
+//    Automerge doc1;
+//    Automerge doc2;
+//
+//    doc1.put(ExId(), Prop("counter"), ScalarValue{ ScalarValue::Str, std::string("bar") });
+//    doc1.commit();
+//
+//    doc2.put(ExId(), Prop("hello"), ScalarValue{ ScalarValue::Str, std::string("world") });
+//    doc2.commit();
+//
+//    doc1.merge(doc2);
+//
+//    EXPECT_EQ((ScalarValue{ ScalarValue::Str, std::string("bar") }),
+//        std::get<ScalarValue>(doc1.get(ExId(), Prop("foo"))->second.data));
+//
+//    EXPECT_EQ(json::parse(R"({
+//    "foo": "bar",
+//    "hello": "world"
+//})"), json(doc1));
+//
+//    doc2.merge(doc1);
+//
+//    EXPECT_EQ(json::parse(R"({
+//    "foo": "bar",
+//    "hello": "world"
+//})"), json(doc2));
+//}
+
+TEST_F(AutomergeTest, ConcurrentUpdatesOfSameField) {
+    Automerge doc1;
+    Automerge doc2;
+
+    doc1.put(ExId(), Prop("field"), ScalarValue{ ScalarValue::Str, std::string("one") });
+    doc1.commit();
+
+    doc2.put(ExId(), Prop("field"), ScalarValue{ ScalarValue::Str, std::string("two") });
+    doc2.commit();
+
+    doc1.merge(doc2);
+
+    EXPECT_EQ((std::unordered_multiset<std::string>{ "one", "two" }), 
+        get_all_to_set(doc1, ExId(), Prop("field")));
+}
+
+TEST_F(AutomergeTest, ConcurrentUpdatesOfSameListElement) {
+    Automerge doc1;
+    Automerge doc2;
+    auto list_id = doc1.put_object(ExId(), Prop("birds"), ObjType::List);
+
+    doc1.insert(list_id, 0, ScalarValue{ ScalarValue::Str, std::string("finch") });
+    doc1.commit();
+    doc2.merge(doc1);
+
+    doc1.put(list_id, Prop(0), ScalarValue{ ScalarValue::Str, std::string("greenfinch") });
+    doc1.commit();
+    doc2.put(list_id, Prop(0), ScalarValue{ ScalarValue::Str, std::string("goldfinch") });
+    doc2.commit();
+
+    doc1.merge(doc2);
+
+    EXPECT_EQ((std::unordered_multiset<std::string>{ "greenfinch", "goldfinch" }),
+        get_all_to_set(doc1, list_id, Prop(0)));
+}
+
+TEST_F(AutomergeTest, AssignmentConflictsOfDifferentTypes) {
+    Automerge doc1;
+    Automerge doc2;
+    Automerge doc3;
+
+    doc1.put(ExId(), Prop("field"), ScalarValue{ ScalarValue::Str, std::string("string") });
+    doc1.commit();
+
+    doc2.put_object(ExId(), Prop("field"), ObjType::List);
+    doc2.commit();
+    
+    doc3.put_object(ExId(), Prop("field"), ObjType::Map);
+    doc3.commit();
+
+    doc1.merge(doc2);
+    doc1.merge(doc3);
+
+    EXPECT_EQ((std::unordered_multiset<std::string>{ "string", "o_list", "o_map" }),
+        get_all_to_set(doc1, ExId(), Prop("field")));
+}
+
+TEST_F(AutomergeTest, ChangesWithinConflictingMapField) {
+    Automerge doc1;
+    Automerge doc2;
+
+    doc1.put(ExId(), Prop("field"), ScalarValue{ ScalarValue::Str, std::string("string") });
+    doc1.commit();
+
+    auto map_id = doc2.put_object(ExId(), Prop("field"), ObjType::Map);
+    doc2.put(map_id, Prop("innerKey"), ScalarValue{ ScalarValue::Int, (s64)42 });
+    doc2.commit();
+
+    doc1.merge(doc2);
+
+    EXPECT_EQ((std::unordered_multiset<std::string>{ "string", "o_map" }),
+        get_all_to_set(doc1, ExId(), Prop("field")));
+
+    json j1 = doc1;
+    EXPECT_TRUE(json::parse(R"({
+    "field": "string"
+})") == j1 
+    || json::parse(R"({
+    "field": {
+        "innerKey": 42
+    }
+})") == j1);
+}
+
+TEST_F(AutomergeTest, ChangesWithinConflictingListElement) {
+    Automerge doc1;
+    Automerge doc2;
+    doc1.set_actor(ActorId(std::string("01234567")));
+    doc2.set_actor(ActorId(std::string("89abcdef")));
+
+    auto list_id = doc1.put_object(ExId(), Prop("list"), ObjType::List);
+    doc1.insert(list_id, 0, ScalarValue{ ScalarValue::Str, std::string("hello") });
+    doc1.commit();
+    doc2.merge(doc1);
+
+    auto map_in_doc1 = doc1.put_object(list_id, Prop(0), ObjType::Map);
+    doc1.put(map_in_doc1, Prop("map1"), ScalarValue{ ScalarValue::Boolean, true });
+    doc1.put(map_in_doc1, Prop("key"), ScalarValue{ ScalarValue::Int, (s64)1 });
+    doc1.commit();
+
+    auto map_in_doc2 = doc2.put_object(list_id, Prop(0), ObjType::Map);
+    doc2.put(map_in_doc2, Prop("map2"), ScalarValue{ ScalarValue::Boolean, true });
+    doc2.put(map_in_doc2, Prop("key"), ScalarValue{ ScalarValue::Int, (s64)2 });
+    doc2.commit();
+
+    doc1.merge(doc2);
+
+    EXPECT_EQ(json::parse(R"({
+    "list": [{
+        "map1": true,
+        "key": 1
+    }]
+})"), doc1);
+}
+
+TEST_F(AutomergeTest, ConcurrentlyAssignedNestedMapsShouldNotMerge) {
+    Automerge doc1;
+    Automerge doc2;
+
+    auto doc1_map_id = doc1.put_object(ExId(), Prop("config"), ObjType::Map);
+    doc1.put(doc1_map_id, Prop("background"), ScalarValue{ ScalarValue::Str, std::string("blue") });
+    doc1.commit();
+
+    auto doc2_map_id = doc2.put_object(ExId(), Prop("config"), ObjType::Map);
+    doc2.put(doc2_map_id, Prop("logo_url"), ScalarValue{ ScalarValue::Str, std::string("logo.png") });
+    doc2.commit();
+
+    doc1.merge(doc2);
+
+    EXPECT_EQ((std::unordered_multiset<std::string>{ "o_map", "o_map" }),
+        get_all_to_set(doc1, ExId(), Prop("config")));
+
+    json j1 = doc1;
+    EXPECT_TRUE(json::parse(R"({
+    "config": {
+        "background": "blue"
+    }
+})") == j1
+|| json::parse(R"({
+    "config": {
+        "logo_url": "logo.png"
+    }
+})") == j1);
+}
+
+TEST_F(AutomergeTest, ConcurrentInsertionsAtDifferentListPositions) {
+    Automerge doc1;
+    Automerge doc2;
+    doc1.set_actor(ActorId(std::string("01234567")));
+    doc2.set_actor(ActorId(std::string("89abcdef")));
+    ASSERT_TRUE(doc1.get_actor() < doc2.get_actor());
+
+    auto list_id = doc1.put_object(ExId(), Prop("list"), ObjType::List);
+
+    doc1.insert(list_id, 0, ScalarValue{ ScalarValue::Str, std::string("one") });
+    doc1.insert(list_id, 1, ScalarValue{ ScalarValue::Str, std::string("three") });
+    doc1.commit();
+    doc2.merge(doc1);
+
+    doc1.insert(list_id, 1, ScalarValue{ ScalarValue::Str, std::string("two") });
+    doc1.commit();
+    doc2.insert(list_id, 2, ScalarValue{ ScalarValue::Str, std::string("four") });
+    doc2.commit();
+
+    doc1.merge(doc2);
+
+    EXPECT_EQ(json::parse(R"({
+    "list": ["one", "two", "three", "four"]
+})"), json(doc1));
+}
+
+TEST_F(AutomergeTest, ConcurrentInsertionsAtSameListPositions) {
+    Automerge doc1;
+    Automerge doc2;
+    doc1.set_actor(ActorId(std::string("01234567")));
+    doc2.set_actor(ActorId(std::string("89abcdef")));
+    ASSERT_TRUE(doc1.get_actor() < doc2.get_actor());
+
+    auto list_id = doc1.put_object(ExId(), Prop("birds"), ObjType::List);
+
+    doc1.insert(list_id, 0, ScalarValue{ ScalarValue::Str, std::string("parakeet") });
+    doc1.commit();
+    doc2.merge(doc1);
+
+    doc1.insert(list_id, 1, ScalarValue{ ScalarValue::Str, std::string("starling") });
+    doc1.commit();
+    doc2.insert(list_id, 1, ScalarValue{ ScalarValue::Str, std::string("chaffinch") });
+    doc2.commit();
+
+    doc1.merge(doc2);
+
+    EXPECT_EQ(json::parse(R"({
+    "birds": ["parakeet", "chaffinch", "starling"]
+})"), json(doc1));
+}
+
+TEST_F(AutomergeTest, ConcurrentAssignmentAndDeletionOfMapEntry) {
+    Automerge doc1;
+    Automerge doc2;
+
+    doc1.put(ExId(), Prop("bestBird"), ScalarValue{ ScalarValue::Str, std::string("robin") });
+    doc1.commit();
+    doc2.merge(doc1);
+
+    doc1.delete_(ExId(), Prop("bestBird"));
+    doc1.commit();
+    doc2.put(ExId(), Prop("bestBird"), ScalarValue{ ScalarValue::Str, std::string("magpie") });
+    doc2.commit();
+
+    doc1.merge(doc2);
+
+    EXPECT_EQ(json::parse(R"({
+    "bestBird": "magpie"
+})"), json(doc1));
+}
+
+TEST_F(AutomergeTest, ConcurrentAssignmentAndDeletionOfListEntry) {
+    Automerge doc1;
+    Automerge doc2;
+
+    auto list_id = doc1.put_object(ExId(), Prop("birds"), ObjType::List);
+
+    doc1.insert(list_id, 0, ScalarValue{ ScalarValue::Str, std::string("blackbird") });
+    doc1.insert(list_id, 1, ScalarValue{ ScalarValue::Str, std::string("thrush") });
+    doc1.insert(list_id, 2, ScalarValue{ ScalarValue::Str, std::string("goldfinch") });
+    doc1.commit();
+    doc2.merge(doc1);
+
+    doc1.put(list_id, Prop(1), ScalarValue{ ScalarValue::Str, std::string("starling") });
+    doc1.commit();
+    doc2.delete_(list_id, Prop(1));
+    doc2.commit();
+
+    EXPECT_EQ(json::parse(R"({
+    "birds": ["blackbird", "goldfinch"]
+})"), json(doc2));
+
+    EXPECT_EQ(json::parse(R"({
+    "birds": ["blackbird", "starling", "goldfinch"]
+})"), json(doc1));
+
+    doc1.merge(doc2);
+
+    EXPECT_EQ(json::parse(R"({
+    "birds": ["blackbird", "starling", "goldfinch"]
+})"), json(doc1));
+}
+
+TEST_F(AutomergeTest, InsertionAfterDeletedListElement) {
+    Automerge doc1;
+    Automerge doc2;
+
+    auto list_id = doc1.put_object(ExId(), Prop("birds"), ObjType::List);
+
+    doc1.insert(list_id, 0, ScalarValue{ ScalarValue::Str, std::string("blackbird") });
+    doc1.insert(list_id, 1, ScalarValue{ ScalarValue::Str, std::string("thrush") });
+    doc1.insert(list_id, 2, ScalarValue{ ScalarValue::Str, std::string("goldfinch") });
+    doc1.commit();
+    doc2.merge(doc1);
+
+    doc1.delete_(list_id, Prop(1));
+    doc1.delete_(list_id, Prop(1));
+    doc1.commit();
+    doc2.insert(list_id, 2, ScalarValue{ ScalarValue::Str, std::string("starling") });
+    doc2.commit();
+
+    doc1.merge(doc2);
+
+    EXPECT_EQ(json::parse(R"({
+    "birds": ["blackbird", "starling"]
+})"), json(doc1));
+
+    doc2.merge(doc1);
+
+    EXPECT_EQ(json::parse(R"({
+    "birds": ["blackbird", "starling"]
+})"), json(doc2));
+}
+
+TEST_F(AutomergeTest, ConcurrentDeletionOfSameListElement) {
+    Automerge doc1;
+    Automerge doc2;
+
+    auto list_id = doc1.put_object(ExId(), Prop("birds"), ObjType::List);
+
+    doc1.insert(list_id, 0, ScalarValue{ ScalarValue::Str, std::string("albatross") });
+    doc1.insert(list_id, 1, ScalarValue{ ScalarValue::Str, std::string("buzzard") });
+    doc1.insert(list_id, 2, ScalarValue{ ScalarValue::Str, std::string("cormorant") });
+    doc1.commit();
+    doc2.merge(doc1);
+
+    doc1.delete_(list_id, Prop(1));
+    doc1.commit();
+    doc2.delete_(list_id, Prop(1));
+    doc2.commit();
+
+    doc1.merge(doc2);
+
+    EXPECT_EQ(json::parse(R"({
+    "birds": ["albatross", "cormorant"]
+})"), json(doc1));
+
+    doc2.merge(doc1);
+
+    EXPECT_EQ(json::parse(R"({
+    "birds": ["albatross", "cormorant"]
+})"), json(doc2));
+}
+
+TEST_F(AutomergeTest, ConcurrentUpdatesAtDifferentLevels) {
+    Automerge doc1;
+    Automerge doc2;
+
+    auto animals = doc1.put_object(ExId(), Prop("animals"), ObjType::Map);
+    auto birds = doc1.put_object(animals, Prop("birds"), ObjType::Map);
+    doc1.put(birds, Prop("pink"), ScalarValue{ ScalarValue::Str, std::string("flamingo") });
+    doc1.put(birds, Prop("black"), ScalarValue{ ScalarValue::Str, std::string("starling") });
+    doc1.commit();
+
+    auto mammals = doc1.put_object(animals, Prop("mammals"), ObjType::List);
+    doc1.insert(mammals, 0, ScalarValue{ ScalarValue::Str, std::string("badger") });
+    doc1.commit();
+
+    doc2.merge(doc1);
+
+    doc1.put(birds, Prop("brown"), ScalarValue{ ScalarValue::Str, std::string("sparrow") });
+    doc1.commit();
+
+    doc2.delete_(animals, Prop("birds"));
+    doc2.commit();
+
+    doc1.merge(doc2);
+
+    EXPECT_EQ(json::parse(R"({
+    "animals": {
+        "mammals": ["badger"]
+    }
+})"), json(doc1));
+
+    EXPECT_EQ(json::parse(R"({
+    "animals": {
+        "mammals": ["badger"]
+    }
+})"), json(doc2));
+}
+
+TEST_F(AutomergeTest, ConcurrentUpdatesOfConcurrentlyDeletedObjects) {
+    Automerge doc1;
+    Automerge doc2;
+
+    auto birds = doc1.put_object(ExId(), Prop("birds"), ObjType::Map);
+    auto blackbird = doc1.put_object(birds, Prop("blackbird"), ObjType::Map);
+    doc1.put(blackbird, Prop("feathers"), ScalarValue{ ScalarValue::Str, std::string("black") });
+    doc1.commit();
+
+    doc2.merge(doc1);
+
+    doc1.delete_(birds, Prop("blackbird"));
+    doc1.commit();
+
+    doc2.put(blackbird, Prop("beak"), ScalarValue{ ScalarValue::Str, std::string("orange") });
+    doc2.commit();
+
+    doc1.merge(doc2);
+
+    EXPECT_EQ(json::parse(R"({
+    "birds": {
+    }
+})"), json(doc1));
+}
+
+TEST_F(AutomergeTest, DoesNotInterleaveSequenceInsertionsAtSamePosition) {
+    Automerge doc1;
+    Automerge doc2;
+    doc1.set_actor(ActorId(std::string("01234567")));
+    doc2.set_actor(ActorId(std::string("89abcdef")));
+
+    auto wisdom = doc1.put_object(ExId(), Prop("wisdom"), ObjType::List);
+    doc1.commit();
+    doc2.merge(doc1);
+
+    doc1.insert(wisdom, 0, ScalarValue{ ScalarValue::Str, std::string("to") });
+    doc1.insert(wisdom, 1, ScalarValue{ ScalarValue::Str, std::string("be") });
+    doc1.insert(wisdom, 2, ScalarValue{ ScalarValue::Str, std::string("is") });
+    doc1.insert(wisdom, 3, ScalarValue{ ScalarValue::Str, std::string("to") });
+    doc1.insert(wisdom, 4, ScalarValue{ ScalarValue::Str, std::string("do") });
+    doc1.commit();
+
+
+    doc2.insert(wisdom, 0, ScalarValue{ ScalarValue::Str, std::string("to") });
+    doc2.insert(wisdom, 1, ScalarValue{ ScalarValue::Str, std::string("do") });
+    doc2.insert(wisdom, 2, ScalarValue{ ScalarValue::Str, std::string("is") });
+    doc2.insert(wisdom, 3, ScalarValue{ ScalarValue::Str, std::string("to") });
+    doc2.insert(wisdom, 4, ScalarValue{ ScalarValue::Str, std::string("be") });
+    doc2.commit();
+
+    doc1.merge(doc2);
+
+    EXPECT_EQ(json::parse(R"({
+    "wisdom": ["to", "do", "is", "to", "be", "to", "be", "is", "to", "do"]
+})"), json(doc1));
+}
+
+TEST_F(AutomergeTest, MultipleInsertionsAtSameListPositionWithInsertionByGreaterActorId) {
+    Automerge doc1;
+    Automerge doc2;
+    doc1.set_actor(ActorId(std::string("01234567")));
+    doc2.set_actor(ActorId(std::string("89abcdef")));
+    ASSERT_TRUE(doc1.get_actor() < doc2.get_actor());
+
+    auto list = doc1.put_object(ExId(), Prop("list"), ObjType::List);
+    doc1.insert(list, 0, ScalarValue{ ScalarValue::Str, std::string("two") });
+    doc1.commit();
+    doc2.merge(doc1);
+
+    doc2.insert(list, 0, ScalarValue{ ScalarValue::Str, std::string("one") });
+    doc2.commit();
+
+    EXPECT_EQ(json::parse(R"({
+    "list": ["one", "two"]
+})"), json(doc2));
+}
+
+TEST_F(AutomergeTest, MultipleInsertionsAtSameListPositionWithInsertionByLesserActorId) {
+    Automerge doc1;
+    Automerge doc2;
+    doc2.set_actor(ActorId(std::string("01234567")));
+    doc1.set_actor(ActorId(std::string("89abcdef")));
+    ASSERT_TRUE(doc2.get_actor() < doc1.get_actor());
+
+    auto list = doc1.put_object(ExId(), Prop("list"), ObjType::List);
+    doc1.insert(list, 0, ScalarValue{ ScalarValue::Str, std::string("two") });
+    doc1.commit();
+    doc2.merge(doc1);
+
+    doc2.insert(list, 0, ScalarValue{ ScalarValue::Str, std::string("one") });
+    doc2.commit();
+
+    EXPECT_EQ(json::parse(R"({
+    "list": ["one", "two"]
+})"), json(doc2));
+}
+
+TEST_F(AutomergeTest, InsertionsConsistentWithCausality) {
+    Automerge doc1;
+    Automerge doc2;
+
+    auto list = doc1.put_object(ExId(), Prop("list"), ObjType::List);
+    doc1.insert(list, 0, ScalarValue{ ScalarValue::Str, std::string("four") });
+    doc1.commit();
+    doc2.merge(doc1);
+
+    doc2.insert(list, 0, ScalarValue{ ScalarValue::Str, std::string("three") });
+    doc2.commit();
+    doc1.merge(doc2);
+
+    doc1.insert(list, 0, ScalarValue{ ScalarValue::Str, std::string("two") });
+    doc1.commit();
+    doc2.merge(doc1);
+
+    doc2.insert(list, 0, ScalarValue{ ScalarValue::Str, std::string("one") });
+    doc2.commit();
+
+    EXPECT_EQ(json::parse(R"({
+    "list": ["one", "two", "three", "four"]
+})"), json(doc2));
+}
+
+TEST_F(AutomergeTest, SaveAndRestoreEmpty) {
+    Automerge doc;
+    auto loaded = Automerge::load(make_bin_slice(doc.save()));
+
+    EXPECT_EQ(json::parse(R"({
+})"), json(loaded));
+}
+
+TEST_F(AutomergeTest, SaveRestoreComplex) {
+    Automerge doc1;
+    Automerge doc2;
+
+    auto todos = doc1.put_object(ExId(), Prop("todos"), ObjType::List);
+    auto first_todo = doc1.insert_object(todos, 0, ObjType::Map);
+    doc1.put(first_todo, Prop("title"), ScalarValue{ ScalarValue::Str, std::string("water plants") });
+    doc1.put(first_todo, Prop("done"), ScalarValue{ ScalarValue::Boolean, false });
+    doc1.commit();
+    doc2.merge(doc1);
+
+    doc2.put(first_todo, Prop("title"), ScalarValue{ ScalarValue::Str, std::string("weed plants") });
+    doc2.commit();
+    doc1.put(first_todo, Prop("title"), ScalarValue{ ScalarValue::Str, std::string("kill plants") });
+    doc1.commit();
+    doc1.merge(doc2);
+
+    auto reloaded = Automerge::load(make_bin_slice(doc1.save()));
+
+    EXPECT_EQ((std::unordered_multiset<std::string>{ "weed plants", "kill plants" }),
+        get_all_to_set(reloaded, first_todo, Prop("title")));
+
+    json jr = reloaded;
+    EXPECT_TRUE(json::parse(R"({
+    "todos": [
+        {
+            "title": "weed plants",
+            "done": false
+        }]
+})") == jr
+|| json::parse(R"({
+    "todos": [
+        {
+            "title": "kill plants",
+            "done": false
+        }]
+    }
+})") == jr);
+}
+
+TEST_F(AutomergeTest, HandleRepeatedOutOfOrderChanges) {
+    Automerge doc1;
+
+    auto list = doc1.put_object(ExId(), Prop("list"), ObjType::List);
+    doc1.insert(list, 0, ScalarValue{ ScalarValue::Str, std::string("a") });
+    doc1.commit();
+
+    auto doc2 = doc1.fork();
+
+    doc1.insert(list, 1, ScalarValue{ ScalarValue::Str, std::string("b") });
+    doc1.commit();
+    doc1.insert(list, 2, ScalarValue{ ScalarValue::Str, std::string("c") });
+    doc1.commit();
+    doc1.insert(list, 3, ScalarValue{ ScalarValue::Str, std::string("d") });
+    doc1.commit();
+
+    auto changes_p = doc1.get_changes({});
+    std::vector<Change> changes;
+    changes.reserve(changes_p.size());
+    for (auto& change_p : changes_p) {
+        changes.push_back(*change_p);
+    }
+
+    doc2.apply_changes(std::vector<Change>(changes.cbegin() + 2, changes.cend()));
+    doc2.apply_changes(std::vector<Change>(changes.cbegin() + 2, changes.cend()));
+    doc2.apply_changes(std::move(changes));
+
+    EXPECT_EQ(doc1.save(), doc2.save());
+}
+
+TEST_F(AutomergeTest, SaveRestoreComplexTransactional) {
+    Automerge doc1;
+    Automerge doc2;
+
+    ExId first_todo = doc1.transact_with(
+        [](const std::vector<ExId>& result) { return CommitOptions<OpObserver>(); },
+        [](Transaction& d)->std::vector<ExId> {
+            auto todos = d.put_object(ExId(), Prop("todos"), ObjType::List);
+            auto first_todo = d.insert_object(todos, 0, ObjType::Map);
+            d.put(first_todo, Prop("title"), ScalarValue{ ScalarValue::Str, std::string("water plants") });
+            d.put(first_todo, Prop("done"), ScalarValue{ ScalarValue::Boolean, false });
+
+            return { first_todo };
+        }
+    ).first[0];
+    doc2.merge(doc1);
+
+    doc2.transact_with(
+        [](const std::vector<ExId>& result) { return CommitOptions<OpObserver>(); },
+        [&](Transaction& tx)->std::vector<ExId> {
+            tx.put(first_todo, Prop("title"), ScalarValue{ ScalarValue::Str, std::string("weed plants") });
+
+            return {};
+        }
+    );
+
+    doc1.transact_with(
+        [](const std::vector<ExId>& result) { return CommitOptions<OpObserver>(); },
+        [&](Transaction& tx)->std::vector<ExId> {
+            tx.put(first_todo, Prop("title"), ScalarValue{ ScalarValue::Str, std::string("kill plants") });
+
+            return {};
+        }
+    );
+
+    doc1.merge(doc2);
+
+    auto reloaded = Automerge::load(make_bin_slice(doc1.save()));
+
+    EXPECT_EQ((std::unordered_multiset<std::string>{ "weed plants", "kill plants" }),
+        get_all_to_set(reloaded, first_todo, Prop("title")));
+
+    json jr = reloaded;
+    EXPECT_TRUE(json::parse(R"({
+    "todos": [
+        {
+            "title": "weed plants",
+            "done": false
+        }]
+})") == jr
+|| json::parse(R"({
+    "todos": [
+        {
+            "title": "kill plants",
+            "done": false
+        }]
+    }
+})") == jr);
+}
+
+/////////////////////////////////////////////////////////
+// automerge/src/sync.rs
+/////////////////////////////////////////////////////////
+
 class SyncTest : public AutomergeTest {
 };
 

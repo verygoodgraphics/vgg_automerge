@@ -183,21 +183,9 @@ struct ScalarValue {
         return (tag == other.tag) && (data == other.data);
     }
 
-    std::optional<s64> to_s64() const {
-        switch (tag) {
-        case ScalarValue::Int:
-        case ScalarValue::Timestamp:
-            return std::get<s64>(data);
-        case ScalarValue::Uint:
-            return (s64)std::get<u64>(data);
-        case ScalarValue::F64:
-            return (s64)std::get<double>(data);
-        case ScalarValue::Counter:
-            return std::get<Counter>(data).current;
-        default:
-            return {};
-        }
-    }
+    std::optional<s64> to_s64() const;
+
+    std::string to_string() const;
 };
 
 ///////////////////////////////////////////////
