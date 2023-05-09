@@ -138,6 +138,8 @@ struct Counter {
     s64 current = 0;
     usize increments = 0;
 
+    Counter(s64 _start = 0) : start(_start), current(_start), increments(0) {}
+
     bool operator==(const Counter& other) const {
         return (current == other.current);
     }

@@ -427,33 +427,25 @@ TEST_F(AutomergeTest, MergeConcurrentMapPropUpdates) {
 }
 
 // increment not implement
-//TEST_F(AutomergeTest, AddConcurrentIncrementsOfSameProperty) {
-//    Automerge doc1;
-//    Automerge doc2;
-//
-//    doc1.put(ExId(), Prop("counter"), ScalarValue{ ScalarValue::Str, std::string("bar") });
-//    doc1.commit();
-//
-//    doc2.put(ExId(), Prop("hello"), ScalarValue{ ScalarValue::Str, std::string("world") });
-//    doc2.commit();
-//
-//    doc1.merge(doc2);
-//
-//    EXPECT_EQ((ScalarValue{ ScalarValue::Str, std::string("bar") }),
-//        std::get<ScalarValue>(doc1.get(ExId(), Prop("foo"))->second.data));
-//
-//    EXPECT_EQ(json::parse(R"({
-//    "foo": "bar",
-//    "hello": "world"
-//})"), json(doc1));
-//
-//    doc2.merge(doc1);
-//
-//    EXPECT_EQ(json::parse(R"({
-//    "foo": "bar",
-//    "hello": "world"
-//})"), json(doc2));
-//}
+TEST_F(AutomergeTest, AddConcurrentIncrementsOfSameProperty) {
+    Automerge doc1;
+    Automerge doc2;
+
+    doc1.put(ExId(), Prop("counter"), ScalarValue{ ScalarValue::Counter, Counter(0) });
+    doc1.commit();
+    doc2.merge(doc1);
+
+    doc1.increment(ExId(), Prop("counter"), 1);
+    doc1.commit();
+    doc2.increment(ExId(), Prop("counter"), 2);
+    doc2.commit();
+
+    doc1.merge(doc2);
+
+    EXPECT_EQ(json::parse(R"({
+    "counter": 3
+})"), json(doc1));
+}
 
 TEST_F(AutomergeTest, ConcurrentUpdatesOfSameField) {
     Automerge doc1;
@@ -967,7 +959,6 @@ TEST_F(AutomergeTest, SaveRestoreComplex) {
             "title": "kill plants",
             "done": false
         }]
-    }
 })") == jr);
 }
 
@@ -987,12 +978,7 @@ TEST_F(AutomergeTest, HandleRepeatedOutOfOrderChanges) {
     doc1.insert(list, 3, ScalarValue{ ScalarValue::Str, std::string("d") });
     doc1.commit();
 
-    auto changes_p = doc1.get_changes({});
-    std::vector<Change> changes;
-    changes.reserve(changes_p.size());
-    for (auto& change_p : changes_p) {
-        changes.push_back(*change_p);
-    }
+    auto changes = vector_of_pointer_to_vector(doc1.get_changes({}));
 
     doc2.apply_changes(std::vector<Change>(changes.cbegin() + 2, changes.cend()));
     doc2.apply_changes(std::vector<Change>(changes.cbegin() + 2, changes.cend()));
@@ -1057,9 +1043,221 @@ TEST_F(AutomergeTest, SaveRestoreComplexTransactional) {
             "title": "kill plants",
             "done": false
         }]
-    }
 })") == jr);
 }
+
+TEST_F(AutomergeTest, ListCounterDel) {
+    Automerge doc1;
+    doc1.set_actor(ActorId(std::string("01234567")));
+
+    auto list = doc1.put_object(ExId(), Prop("list"), ObjType::List);
+    doc1.insert(list, 0, ScalarValue{ ScalarValue::Str, std::string("a") });
+    doc1.insert(list, 1, ScalarValue{ ScalarValue::Str, std::string("b") });
+    doc1.insert(list, 2, ScalarValue{ ScalarValue::Str, std::string("c") });
+    doc1.commit();
+
+    auto doc2 = Automerge::load(make_bin_slice(doc1.save()));
+    doc2.set_actor(ActorId(std::string("456789ab")));
+
+    auto doc3 = Automerge::load(make_bin_slice(doc1.save()));
+    doc3.set_actor(ActorId(std::string("89abcdef")));
+
+    doc1.put(list, Prop(1), ScalarValue{ ScalarValue::Counter, Counter(0) });
+    doc1.commit();
+    doc2.put(list, Prop(1), ScalarValue{ ScalarValue::Counter, Counter(10) });
+    doc2.commit();
+    doc3.put(list, Prop(1), ScalarValue{ ScalarValue::Counter, Counter(100) });
+    doc3.commit();
+
+    doc1.put(list, Prop(2), ScalarValue{ ScalarValue::Counter, Counter(0) });
+    doc1.commit();
+    doc2.put(list, Prop(2), ScalarValue{ ScalarValue::Counter, Counter(10) });
+    doc2.commit();
+    doc3.put(list, Prop(2), ScalarValue{ ScalarValue::Int, (s64)100 });
+    doc3.commit();
+
+    doc1.increment(list, 1, 1);
+    doc1.increment(list, 2, 1);
+    doc1.commit();
+
+    doc1.merge(doc2);
+    doc1.merge(doc3);
+
+    EXPECT_EQ((std::unordered_multiset<std::string>{ "1", "10", "100" }),
+        get_all_to_set(doc1, list, Prop(1)));
+
+    EXPECT_EQ((std::unordered_multiset<std::string>{ "1", "10", "100" }),
+        get_all_to_set(doc1, list, Prop(2)));
+
+    doc1.increment(list, 1, 1);
+    doc1.increment(list, 2, 1);
+    doc1.commit();
+
+    EXPECT_EQ((std::unordered_multiset<std::string>{ "2", "11", "101" }),
+        get_all_to_set(doc1, list, Prop(1)));
+
+    EXPECT_EQ((std::unordered_multiset<std::string>{ "2", "11" }),
+        get_all_to_set(doc1, list, Prop(2)));
+
+    doc1.delete_(list, 2);
+    doc1.commit();
+    EXPECT_EQ(2, doc1.length(list));
+
+    auto doc4 = Automerge::load(make_bin_slice(doc1.save()));
+    EXPECT_EQ(2, doc4.length(list));
+
+    doc1.delete_(list, 1);
+    doc1.commit();
+    EXPECT_EQ(1, doc1.length(list));
+
+    auto doc5 = Automerge::load(make_bin_slice(doc1.save()));
+    EXPECT_EQ(1, doc5.length(list));
+}
+
+TEST_F(AutomergeTest, ObserveCounterChangeApplication) {
+    Automerge doc;
+
+    doc.put(ExId(), Prop("counter"), ScalarValue{ ScalarValue::Counter, Counter(1) });
+    doc.commit();
+
+    doc.increment(ExId(), Prop("counter"), 2);
+    doc.commit();
+    doc.increment(ExId(), Prop("counter"), 5);
+    doc.commit();
+
+    auto changes = vector_of_pointer_to_vector(doc.get_changes({}));
+
+    // TODO: observer
+    Automerge doc_ob;
+    doc_ob.apply_changes(std::move(changes));
+
+    EXPECT_EQ(json::parse(R"({
+    "counter": 8
+})"), json(doc_ob));
+}
+
+TEST_F(AutomergeTest, IncrementNonCounterMap) {
+    Automerge doc;
+    EXPECT_THROW(doc.increment(ExId(), Prop("nothing"), 2), AutomergeError);
+
+    doc.put(ExId(), Prop("non-counter"), ScalarValue{ ScalarValue::Str, std::string("mystring") });
+    doc.commit();
+    EXPECT_THROW(doc.increment(ExId(), Prop("non-counter"), 2), AutomergeError);
+
+    doc.put(ExId(), Prop("counter"), ScalarValue{ ScalarValue::Counter, Counter(1) });
+    doc.commit();
+    EXPECT_NO_THROW(doc.increment(ExId(), Prop("counter"), 2));
+
+    Automerge doc1;
+    doc1.set_actor(ActorId(std::vector<u8>{1}));
+    Automerge doc2;
+    doc2.set_actor(ActorId(std::vector<u8>{2}));
+    ASSERT_TRUE(doc1.get_actor() < doc2.get_actor());
+
+    doc1.put(ExId(), Prop("key"), ScalarValue{ ScalarValue::Counter, Counter(1) });
+    doc1.commit();
+    doc2.put(ExId(), Prop("key"), ScalarValue{ ScalarValue::Str, std::string("mystring") });
+    doc2.commit();
+
+    doc1.merge(doc2);
+
+    EXPECT_NO_THROW(doc1.increment(ExId(), Prop("key"), 2));
+    doc1.commit();
+
+    EXPECT_EQ(json::parse(R"({
+    "key": 3
+})"), json(doc1));
+}
+
+TEST_F(AutomergeTest, IncrementNonCounterList) {
+    Automerge doc;
+    auto list = doc.put_object(ExId(), Prop("list"), ObjType::List);
+    doc.commit();
+
+    doc.insert(list, 0, ScalarValue{ ScalarValue::Str, std::string("mystring") });
+    doc.commit();
+    EXPECT_THROW(doc.increment(list, Prop(0), 2), AutomergeError);
+
+    doc.insert(list, 0, ScalarValue{ ScalarValue::Counter, Counter(1) });
+    doc.commit();
+    EXPECT_NO_THROW(doc.increment(list, Prop(0), 2));
+
+    Automerge doc1;
+    doc1.set_actor(ActorId(std::vector<u8>{1}));
+    list = doc1.put_object(ExId(), Prop("list"), ObjType::List);
+    doc1.commit();
+    doc1.insert(list, 0, ScalarValue());
+    doc1.commit();
+
+    Automerge doc2 = doc1.fork();
+    doc2.set_actor(ActorId(std::vector<u8>{2}));
+    ASSERT_TRUE(doc1.get_actor() < doc2.get_actor());
+
+    doc1.put(list, Prop(0), ScalarValue{ ScalarValue::Counter, Counter(1) });
+    doc1.commit();
+    doc2.put(list, Prop(0), ScalarValue{ ScalarValue::Str, std::string("mystring") });
+    doc2.commit();
+
+    doc1.merge(doc2);
+
+    EXPECT_NO_THROW(doc1.increment(list, Prop(0), 2));
+    doc1.commit();
+
+    EXPECT_EQ(json::parse(R"({
+    "list": [3]
+})"), json(doc1));
+}
+
+TEST_F(AutomergeTest, TestLocalIncInMap) {
+    Automerge doc1;
+    doc1.set_actor(ActorId(std::string("01234567")));
+
+    doc1.put(ExId(), Prop("hello"), ScalarValue{ ScalarValue::Str, std::string("world") });
+    doc1.commit();
+
+    auto doc2 = Automerge::load(make_bin_slice(doc1.save()));
+    doc2.set_actor(ActorId(std::string("456789ab")));
+
+    auto doc3 = Automerge::load(make_bin_slice(doc1.save()));
+    doc3.set_actor(ActorId(std::string("89abcdef")));
+
+    doc1.put(ExId(), Prop("cnt"), ScalarValue{ ScalarValue::Uint, (u64)20 });
+    doc1.commit();
+
+    doc2.put(ExId(), Prop("cnt"), ScalarValue{ ScalarValue::Counter, Counter(0) });
+    doc2.commit();
+
+    doc3.put(ExId(), Prop("cnt"), ScalarValue{ ScalarValue::Counter, Counter(10) });
+    doc3.commit();
+
+    doc1.merge(doc2);
+    doc1.merge(doc3);
+
+    EXPECT_EQ((std::unordered_multiset<std::string>{ "20", "0", "10" }),
+        get_all_to_set(doc1, ExId(), Prop("cnt")));
+
+    EXPECT_EQ(json::parse(R"({
+    "cnt": 20,
+    "hello": "world"
+})"), json(doc1));
+
+    doc1.increment(ExId(), Prop("cnt"), 5);
+    doc1.commit();
+
+    EXPECT_EQ((std::unordered_multiset<std::string>{ "5", "15" }),
+        get_all_to_set(doc1, ExId(), Prop("cnt")));
+
+    EXPECT_EQ(json::parse(R"({
+    "cnt": 5,
+    "hello": "world"
+})"), json(doc1));
+
+    auto bin1 = doc1.save();
+    auto doc4 = Automerge::load(make_bin_slice(bin1));
+    EXPECT_EQ(bin1, doc4.save());
+}
+
+// TODO: test_merging_test_conflicts_then_saving_and_loading, text not implement
 
 /////////////////////////////////////////////////////////
 // automerge/src/sync.rs

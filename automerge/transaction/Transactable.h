@@ -22,6 +22,9 @@ struct Transactable {
     virtual ExId insert_object(const ExId& obj, usize index, ObjType object) = 0;
 
     // throw AutomergeError
+    virtual void increment(const ExId& obj, Prop&& prop, s64 value) = 0;
+
+    // throw AutomergeError
     virtual void delete_(const ExId& obj, Prop&& prop) = 0;
 
     virtual Keys keys(const ExId& obj) const = 0;

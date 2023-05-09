@@ -61,6 +61,18 @@ std::vector<const T*> vector_to_vector_of_pointer(const std::vector<T>& source) 
     return target;
 }
 
+template <class T>
+std::vector<T> vector_of_pointer_to_vector(const std::vector<const T*>& source) {
+    std::vector<T> target;
+    target.reserve(source.size());
+
+    std::transform(source.begin(), source.end(), 
+        std::back_inserter(target),
+        [](const T* t) { return *t; });
+
+    return target;
+}
+
 u64 get_random_64();
 
 BinSlice make_bin_slice(const std::vector<u8>& bin_vec);

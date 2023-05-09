@@ -131,7 +131,7 @@ std::optional<ScalarValue> ValueIterator::next() {
         if (len != val_raw.last_read) {
             return {};
         }
-        return ScalarValue{ ScalarValue::Counter, Counter{ *val, *val, 0 } };
+        return ScalarValue{ ScalarValue::Counter, Counter(*val) };
     }
     case VALUE_TYPE_TIMESTAMP: {
         auto val = val_raw.read<s64>();

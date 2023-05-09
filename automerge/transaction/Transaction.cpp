@@ -268,6 +268,12 @@ std::optional<OpId> TransactionInner::local_list_op(Automerge& doc, ObjId& obj, 
     return id;
 }
 
+void TransactionInner::increment(Automerge& doc, const ExId& ex_obj, Prop&& prop, s64 value) {
+    auto [obj, obj_type] = doc.exid_to_obj(ex_obj);
+
+    local_op(doc, obj, std::move(prop), OpType{ OpType::Increment, value });
+}
+
 void TransactionInner::delete_(Automerge& doc, const ExId& ex_obj, Prop&& prop) {
     auto [obj, obj_type] = doc.exid_to_obj(ex_obj);
 
@@ -292,6 +298,10 @@ void Transaction::insert(const ExId& obj, usize index, ScalarValue&& value) {
 
 ExId Transaction::insert_object(const ExId& obj, usize index, ObjType value) {
     return inner->insert_object(*doc, obj, index, value);
+}
+
+void Transaction::increment(const ExId& obj, Prop&& prop, s64 value) {
+    inner->increment(*doc, obj, std::move(prop), value);
 }
 
 void Transaction::delete_(const ExId& obj, Prop&& prop) {

@@ -62,9 +62,9 @@ struct Automerge {
         actor{ false, ActorId(true), 0 }, max_op(0) {}
 
     // Set the actor id for this document.
-    Automerge& set_actor(const ActorId& _actor) {
+    Automerge& set_actor(ActorId&& _actor) {
         actor.isUsed = false;
-        actor.unused = _actor;
+        actor.unused = std::move(_actor);
 
         return *this;
     }
@@ -321,6 +321,14 @@ struct Automerge {
     // wasm/lib.rs: insert_object
     // throw AutomergeError
     ExId insert_object(const ExId& obj, usize index, const std::string& value_str);
+
+    // autocommit.rs, wasm/lib.rs: increment
+    // throw AutomergeError
+    void increment(const ExId& obj, Prop&& prop, s64 value) {
+        ensure_transaction_open();
+
+        _transaction->increment(obj, std::move(prop), value);
+    }
 
     // autocommit.rs, wasm/lib.rs: delete
     // throw AutomergeError
