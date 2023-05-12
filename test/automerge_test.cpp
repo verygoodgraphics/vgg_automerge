@@ -1,6 +1,11 @@
 #include <gtest/gtest.h>
+#include <iostream>
+#include <fstream>
+#include <filesystem>
 
 #include "Automerge.h"
+
+namespace fs = std::filesystem;
 
 class AutomergeTest : public ::testing::Test {
 protected:
@@ -1258,6 +1263,387 @@ TEST_F(AutomergeTest, TestLocalIncInMap) {
 }
 
 // TODO: test_merging_test_conflicts_then_saving_and_loading, text not implement
+
+TEST_F(AutomergeTest, DeleteOnlyChange) {
+    Automerge doc1;
+    ExId list = doc1.transact_with(
+        [](const std::vector<ExId>& result) { return CommitOptions<OpObserver>(); },
+        [](Transaction& d)->std::vector<ExId> {
+            auto l = d.put_object(ExId(), Prop("list"), ObjType::List);
+            d.insert(l, 0, ScalarValue{ ScalarValue::Str, std::string("a") });
+
+            return { l };
+        }
+    ).first[0];
+
+    auto doc2 = Automerge::load(make_bin_slice(doc1.save()));
+    doc2.set_actor(ActorId(doc1.get_actor()));
+    doc2.transact_with(
+        [](const std::vector<ExId>& result) { return CommitOptions<OpObserver>(); },
+        [&](Transaction& d)->std::vector<ExId> {
+            d.delete_(list, Prop(0));
+
+            return {};
+        }
+    );
+
+    auto doc3 = Automerge::load(make_bin_slice(doc2.save()));
+    doc3.set_actor(ActorId(doc1.get_actor()));
+    doc3.transact_with(
+        [](const std::vector<ExId>& result) { return CommitOptions<OpObserver>(); },
+        [&](Transaction& d)->std::vector<ExId> {
+            d.insert(list, 0, ScalarValue{ ScalarValue::Str, std::string("b") });
+
+            return {};
+        }
+    );
+
+    auto doc4 = Automerge::load(make_bin_slice(doc3.save()));
+    doc4.set_actor(ActorId(doc1.get_actor()));
+
+    auto changes = doc4.get_changes({});
+
+    ASSERT_EQ(3, changes.size());
+    EXPECT_EQ(4, changes[2]->start_op);
+}
+
+TEST_F(AutomergeTest, SaveAndReloadCreateObject) {
+    Automerge doc1;
+    ExId list = doc1.transact_with(
+        [](const std::vector<ExId>& result) { return CommitOptions<OpObserver>(); },
+        [](Transaction& d)->std::vector<ExId> {
+            return { d.put_object(ExId(), Prop("foo"), ObjType::List) };
+        }
+    ).first[0];
+
+    auto doc2 = Automerge::load(make_bin_slice(doc1.save()));
+    doc2.transact_with(
+        [](const std::vector<ExId>& result) { return CommitOptions<OpObserver>(); },
+        [&](Transaction& d)->std::vector<ExId> {
+            d.insert(list, 0, ScalarValue{ ScalarValue::Uint, (u64)1 });
+
+            return {};
+        }
+    );
+
+    EXPECT_EQ(json::parse(R"({
+    "foo": [1]
+})"), json(doc2));
+
+    EXPECT_NO_THROW(Automerge::load(make_bin_slice(doc2.save())));
+}
+
+TEST_F(AutomergeTest, TestCompressedChanges) {
+    Automerge doc;
+    // DEFLATE_MIN_SIZE(Encoder.h) is 250, so this should trigger compression
+    doc.put(ExId(), Prop("bytes"), ScalarValue{ ScalarValue::Bytes, std::vector<u8>(300, 10) });
+    doc.commit();
+    
+    Change change = doc.get_last_local_change().value();
+    auto& bytes = change.bytes;
+    EXPECT_TRUE(bytes.uncompressed.size() > DEFLATE_MIN_SIZE);
+
+    change.compress();
+    EXPECT_TRUE(bytes.compressed.size() < DEFLATE_MIN_SIZE);
+
+    auto reloaded = Change::from_bytes(std::move(bytes.compressed));
+    EXPECT_EQ(bytes.uncompressed, reloaded->bytes.uncompressed);
+}
+
+// TODO: compress save not implement
+//TEST_F(AutomergeTest, TestCompressedDocCols) {
+//    Automerge doc;
+//    auto list = doc.put_object(ExId(), Prop("list"), ObjType::List);
+//    doc.commit();
+//
+//    std::vector<u64> expected;
+//    expected.reserve(200);
+//    for (u64 i = 0; i < 200; ++i) {
+//        doc.insert(list, i, ScalarValue{ ScalarValue::Uint, i });
+//        doc.commit();
+//        expected.push_back(i);
+//    }
+//
+//    auto& bytes = change.bytes;
+//    EXPECT_TRUE(bytes.uncompressed.size() > DEFLATE_MIN_SIZE);
+//
+//    change.compress();
+//    EXPECT_TRUE(bytes.compressed.size() < DEFLATE_MIN_SIZE);
+//
+//    auto reloaded = Change::from_bytes(std::move(bytes.compressed));
+//    EXPECT_EQ(bytes.uncompressed, reloaded->bytes.uncompressed);
+//}
+
+// TODO: Expand Change not implement
+TEST_F(AutomergeTest, TestChangeEncodingExpandedChangeRoundTrip) {
+    std::vector<u8> change_bytes = {
+        0x85, 0x6f, 0x4a, 0x83, // magic bytes
+        0xb2, 0x98, 0x9e, 0xa9, // checksum
+        1, 61, 0, 2, 0x12, 0x34, // chunkType: change, length, deps, actor '1234'
+        1, 1, 252, 250, 220, 255, 5, // seq, startOp, time
+        14, 73, 110, 105, 116, 105, 97, 108, 105, 122, 97, 116, 105, 111,
+        110, // message: 'Initialization'
+        0, 6, // actor list, column count
+        0x15, 3, 0x34, 1, 0x42, 2, // keyStr, insert, action
+        0x56, 2, 0x57, 1, 0x70, 2, // valLen, valRaw, predNum
+        0x7f, 1, 0x78, // keyStr: 'x'
+        1,    // insert: false
+        0x7f, 1, // action: set
+        0x7f, 19, // valLen: 1 byte of type uint
+        1,  // valRaw: 1
+        0x7f, 0, // predNum: 0
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, // 10 trailing bytes
+    };
+
+    auto change = Change::from_bytes(std::vector<u8>(change_bytes));
+    EXPECT_EQ(change_bytes, change->bytes.uncompressed);
+}
+
+// TODO: text not implement
+TEST_F(AutomergeTest, LoadDocWithDeletedObjects) {
+    Automerge doc;
+    
+    doc.put_object(ExId(), Prop("list"), ObjType::List);
+    doc.commit();
+
+    //doc.put_object(ExId(), Prop("text"), ObjType::Text);
+    
+    doc.put_object(ExId(), Prop("map"), ObjType::Map);
+    doc.commit();
+
+    //doc.put_object(ExId(), Prop("table"), ObjType::Table);
+
+    doc.delete_(ExId(), Prop("list"));
+    doc.commit();
+    doc.delete_(ExId(), Prop("map"));
+    doc.commit();
+
+    auto saved = doc.save();
+    EXPECT_NO_THROW(Automerge::load(make_bin_slice(saved)));
+}
+
+TEST_F(AutomergeTest, InsertAfterManyDeletes) {
+    Automerge doc;
+
+    auto obj = doc.put_object(ExId(), Prop("map"), ObjType::Map);
+    doc.commit();
+
+    for (int i = 0; i < 100; ++i) {
+        ASSERT_NO_THROW(doc.put(obj, Prop(std::to_string(i)), ScalarValue{ ScalarValue::Int, (s64)i }));
+        doc.commit();
+        ASSERT_NO_THROW(doc.delete_(obj, Prop(std::to_string(i))));
+        doc.commit();
+    }
+}
+
+TEST_F(AutomergeTest, SimpleBadSaveload) {
+    Automerge doc;
+    doc.transact_with(
+        [](const std::vector<ExId>& result) { return CommitOptions<OpObserver>(); },
+        [](Transaction& d)->std::vector<ExId> {
+            d.put(ExId(), Prop("count"), ScalarValue{ ScalarValue::Int, (s64)0 });
+            return {};
+        }
+    );
+
+    doc.transact_with(
+        [](const std::vector<ExId>& result) { return CommitOptions<OpObserver>(); },
+        [](Transaction& d)->std::vector<ExId> { return {}; }
+    );
+
+    doc.transact_with(
+        [](const std::vector<ExId>& result) { return CommitOptions<OpObserver>(); },
+        [](Transaction& d)->std::vector<ExId> {
+            d.put(ExId(), Prop("count"), ScalarValue{ ScalarValue::Int, (s64)0 });
+            return {};
+        }
+    );
+
+    auto bytes = doc.save();
+    EXPECT_NO_THROW(Automerge::load(make_bin_slice(bytes)));
+}
+
+// TODO: text not implement
+TEST_F(AutomergeTest, OpsOnWrongObjects) {
+    Automerge doc;
+
+    auto list = doc.put_object(ExId(), Prop("list"), ObjType::List);
+    doc.commit();
+
+    doc.insert(list, 0, ScalarValue{ ScalarValue::Str, std::string("a") });
+    doc.commit();
+    doc.insert(list, 1, ScalarValue{ ScalarValue::Str, std::string("b") });
+    doc.commit();
+
+    EXPECT_THROW(doc.put(list, Prop("a"), ScalarValue{ ScalarValue::Str, std::string("AAA") }),
+        std::runtime_error);
+
+    auto map = doc.put_object(ExId(), Prop("map"), ObjType::Map);
+
+    doc.put(map, Prop("a"), ScalarValue{ ScalarValue::Str, std::string("AAA") });
+    doc.commit();
+    doc.put(map, Prop("b"), ScalarValue{ ScalarValue::Str, std::string("BBB") });
+    doc.commit();
+
+    EXPECT_THROW(doc.insert(map, 0, ScalarValue{ ScalarValue::Str, std::string("b") }),
+        std::runtime_error);
+}
+
+// TODO: storage should be updated
+//TEST_F(AutomergeTest, FuzzCrashers) {
+//    for (auto& p : fs::directory_iterator("fuzz-crashers")) {
+//        std::ifstream file(p.path(), std::ios::binary);
+//        EXPECT_TRUE(file.is_open()) << "file: " << p.path();
+//
+//        std::vector<u8> bytes(std::istreambuf_iterator<char>(file), {});
+//        EXPECT_ANY_THROW(Automerge::load(make_bin_slice(bytes))) << "file: " << p.path();
+//    }
+//}
+
+std::vector<u8> fixture(const std::string& name) {
+    std::ifstream file("fixtures/" + name, std::ios::binary);
+    if (!file.is_open()) {
+        return {};
+    }
+
+    std::vector<u8> bytes(std::istreambuf_iterator<char>(file), {});
+    return bytes;
+}
+
+// TODO: storage should be updated
+//TEST_F(AutomergeTest, OverlongLeb) {
+//    // the value metadata says "2", but the LEB is only 1-byte long and there's an extra 0
+//    auto bytes = fixture("counter_value_has_incorrect_meta.automerge");
+//    EXPECT_FALSE(bytes.empty()) << "counter_value_has_incorrect_meta.automerge not found";
+//    EXPECT_ANY_THROW(Automerge::load(make_bin_slice(bytes)));
+//
+//    // the LEB is overlong (using 2 bytes where one would have sufficed)
+//    bytes = fixture("counter_value_is_overlong.automerge");
+//    EXPECT_FALSE(bytes.empty()) << "counter_value_is_overlong.automerge not found";
+//    EXPECT_ANY_THROW(Automerge::load(make_bin_slice(bytes)));
+//    
+//    // the LEB is correct
+//    bytes = fixture("counter_value_is_ok.automerge");
+//    EXPECT_FALSE(bytes.empty()) << "counter_value_is_ok.automerge not found";
+//    EXPECT_NO_THROW(Automerge::load(make_bin_slice(bytes)));
+//}
+
+// TODO: storage should be updated
+//TEST_F(AutomergeTest, load) {
+//    auto check_fixture = [](const std::string& name) {
+//        auto bytes = fixture(name);
+//        EXPECT_FALSE(bytes.empty()) << name << " not found";
+//        auto doc = Automerge::load(make_bin_slice(bytes));
+//
+//        ExId map_id = doc.get(ExId(), Prop("a"))->first;
+//        EXPECT_EQ((Value{ Value::SCALAR, ScalarValue{ ScalarValue::Str, std::string("b") } }),
+//            doc.get(map_id, Prop("a"))->second);
+//    };
+//
+//    check_fixture("two_change_chunks.automerge");
+//    check_fixture("two_change_chunks_compressed.automerge");
+//    check_fixture("two_change_chunks_out_of_order.automerge");
+//}
+
+TEST_F(AutomergeTest, Negtive64) {
+    Automerge doc;
+    EXPECT_NO_THROW(doc.transact_with(
+        [](const std::vector<ExId>& result) { return CommitOptions<OpObserver>(); },
+        [](Transaction& d)->std::vector<ExId> {
+            d.put(ExId(), Prop("a"), ScalarValue{ ScalarValue::Int, (s64)-64 });
+            return {};
+        }
+    ));
+}
+
+TEST_F(AutomergeTest, ObjId64bits) {
+    auto check_fixture = [](const std::string& name) {
+        auto bytes = fixture(name);
+        EXPECT_FALSE(bytes.empty()) << name << " not found";
+        auto doc = Automerge::load(make_bin_slice(bytes));
+
+        ExId map_id = doc.get(ExId(), Prop("a"))->first;
+        EXPECT_FALSE(ExId() == map_id);
+    };
+
+    check_fixture("64bit_obj_id_change.automerge");
+    check_fixture("64bit_obj_id_doc.automerge");
+}
+
+TEST_F(AutomergeTest, badChangeOnOptreeNodeBoundary) {
+    Automerge doc;
+    EXPECT_NO_THROW(doc.transact_with(
+        [](const std::vector<ExId>& result) { return CommitOptions<OpObserver>(); },
+        [](Transaction& d)->std::vector<ExId> {
+            d.put(ExId(), Prop("a"), ScalarValue{ ScalarValue::Str, std::string("z")});
+            d.put(ExId(), Prop("b"), ScalarValue{ ScalarValue::Int, (s64)0 });
+            d.put(ExId(), Prop("c"), ScalarValue{ ScalarValue::Int, (s64)0 });
+            return {};
+        }
+    ));
+
+    u64 iterations = 15;
+    for (u64 i = 0; i < iterations; ++i) {
+        EXPECT_NO_THROW(doc.transact_with(
+            [](const std::vector<ExId>& result) { return CommitOptions<OpObserver>(); },
+            [&](Transaction& d)->std::vector<ExId> {
+                std::string s((usize)i, 'a');
+                d.put(ExId(), Prop("a"), ScalarValue{ ScalarValue::Str, s });
+                d.put(ExId(), Prop("b"), ScalarValue{ ScalarValue::Uint, i + 1 });
+                d.put(ExId(), Prop("c"), ScalarValue{ ScalarValue::Uint, i + 1 });
+                return {};
+            }
+        ));
+    }
+
+    auto doc2 = Automerge::load(make_bin_slice(doc.save()));
+    EXPECT_NO_THROW(doc.transact_with(
+        [](const std::vector<ExId>& result) { return CommitOptions<OpObserver>(); },
+        [&](Transaction& d)->std::vector<ExId> {
+            u64 i = iterations + 2;
+            std::string s((usize)i, 'a');
+            d.put(ExId(), Prop("a"), ScalarValue{ ScalarValue::Str, s });
+            d.put(ExId(), Prop("b"), ScalarValue{ ScalarValue::Uint, i });
+            d.put(ExId(), Prop("c"), ScalarValue{ ScalarValue::Uint, i });
+            return {};
+        }
+    ));
+
+    auto change = doc.get_changes(doc2.get_heads());
+    EXPECT_NO_THROW(doc2.apply_changes(vector_of_pointer_to_vector(change)));
+    EXPECT_NO_THROW(Automerge::load(make_bin_slice(doc2.save())));
+}
+
+// TODO: to be fixed #572
+//TEST_F(AutomergeTest, RegressionNthMiscount) {
+//    Automerge doc;
+//    (doc.transact_with(
+//        [](const std::vector<ExId>& result) { return CommitOptions<OpObserver>(); },
+//        [](Transaction& d)->std::vector<ExId> {
+//            auto list_id = d.put_object(ExId(), Prop("listval"), ObjType::List);
+//            for (usize i = 0; i < 30; ++i) {
+//                d.insert(list_id, i, ScalarValue{ ScalarValue::Null, {} });
+//                auto map = d.put_object(list_id, Prop(i), ObjType::Map);
+//                d.put(map, Prop("test"), ScalarValue{ ScalarValue::Int, (s64)i });
+//            }
+//            return {};
+//        }
+//    ));
+//
+//    auto ss = json(doc).dump(2);
+//
+//    for (usize i = 0; i < 30; ++i) {
+//        auto& [list_id, obj_type1] = doc.get(ExId(), Prop("listval")).value();
+//        EXPECT_EQ((Value{ Value::OBJECT, ObjType::List }), obj_type1);
+//
+//        auto& [map_id, obj_type2] = doc.get(list_id, Prop(i)).value();
+//        EXPECT_EQ((Value{ Value::OBJECT, ObjType::Map }), obj_type2);
+//
+//        auto& obj_type3 = doc.get(map_id, Prop("test"))->second;
+//        EXPECT_EQ((Value{ Value::SCALAR, ScalarValue{ ScalarValue::Int, (s64)i } }),
+//            obj_type3) << "on run " << i;
+//    }
+//}
 
 /////////////////////////////////////////////////////////
 // automerge/src/sync.rs
