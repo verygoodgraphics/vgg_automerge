@@ -22,31 +22,11 @@ QueryResult SeekOp::query_node_with_metadata(const OpTreeNode& child, const OpSe
     }
 
     if (op.key.tag == Key::Map) {
-        if (start) {
-            if (pos + child.len() >= *start) {
-                // skip empty nodes
-                if (child.index.visible_len() == 0) {
-                    pos += child.len();
-                    return QueryResult{ QueryResult::NEXT, 0 };
-                }
-                else {
-                    return QueryResult{ QueryResult::DESCEND, 0 };
-                }
-            }
-            else {
-                pos += child.len();
-                return QueryResult{ QueryResult::NEXT, 0 };
-            }
-        }
-        else {
-            // in the root node find the first op position for the key
-            usize new_start = binary_search_by(child, [&](const Op* op) {
-                return m.key_cmp(op->key, this->op.key);
-                });
-            start = new_start;
-            pos = new_start;
-            return QueryResult{ QueryResult::SKIP, new_start };
-        }
+        auto start = binary_search_by(child, [&](const Op* op) {
+            return m.key_cmp(op->key, this->op.key);
+        });
+        pos = start;
+        return QueryResult{ QueryResult::SKIP, start };
     }
     else if (std::get<ElemId>(op.key.data) == HEAD) {
         while (pos < child.len()) {

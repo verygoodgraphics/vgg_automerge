@@ -49,15 +49,9 @@ int OpSetMetadata::key_cmp(const Key& left, const Key& right) const {
 }
 
 int OpSetMetadata::lamport_cmp(const OpId& left, const OpId& right) const {
-    if (left.counter == 0 && right.counter == 0)
-        return 0;
-    if (left.counter == 0)
-        return -1;
-    if (right.counter == 0)
-        return 1;
-
-    if (left.counter == right.counter)
+    if (left.counter == right.counter) {
         return actors[left.actor].cmp(actors[right.actor]);
+    }
 
     if (left.counter < right.counter)
         return -1;

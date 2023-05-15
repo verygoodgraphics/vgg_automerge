@@ -138,13 +138,20 @@ std::optional<const Op*> OpTreeIter::nth(usize n) {
 
 /////////////////////////////////////////////////////////
 
-bool OpTreeNode::search(TreeQuery& query, const OpSetMetadata& m, std::optional<usize> _skip) const {
-    usize skip = _skip.value_or(0);
+bool OpTreeNode::search_element(TreeQuery& query, const OpSetMetadata& m, usize index) const {
+    if (index < elements.size() &&
+        query.query_element_with_metadata(elements[index], m).tag == QueryResult::FINISH) {
+        return true;
+    }
+    return false;
+}
 
+bool OpTreeNode::search(TreeQuery& query, const OpSetMetadata& m, std::optional<usize> skip) const {
     if (is_leaf()) {
-        if (skip >= elements.size())
+        usize skip_value = skip.value_or(0);
+        if (skip_value >= elements.size())
             return false;
-        for (auto iter = std::next(elements.begin(), skip); iter != elements.end(); ++iter) {
+        for (auto iter = std::next(elements.begin(), skip_value); iter != elements.end(); ++iter) {
             if (query.query_element_with_metadata(*iter, m).tag == QueryResult::FINISH)
                 return true;
         }
@@ -153,27 +160,12 @@ bool OpTreeNode::search(TreeQuery& query, const OpSetMetadata& m, std::optional<
 
     for (usize child_index = 0; child_index < children.size(); ++child_index) {
         auto& child = children[child_index];
-        if (skip > child.len()) {
-            // not in this child at all
-            // take off the number of elements in the child as well as the next element
-            skip -= child.len() + 1;
-        }
-        else if (skip == child.len()) {
-            // just try the element
-            skip -= child.len();
-            if (child_index < elements.size() &&
-                query.query_element_with_metadata(elements[child_index], m).tag == QueryResult::FINISH) {
-                return true;
-            }
-        }
-        else {
+        if (!skip.has_value()) {
             // descend and try find it
             auto res = query.query_node_with_metadata(child, m);
             switch (res.tag) {
             case QueryResult::DESCEND:
-                // search in the child node, passing in the number of items left to
-                // skip
-                if (child.search(query, m, { skip })) {
+                if (child.search(query, m, {})) {
                     return true;
                 }
                 break;
@@ -187,12 +179,29 @@ bool OpTreeNode::search(TreeQuery& query, const OpSetMetadata& m, std::optional<
             default:
                 break;
             }
-            if (child_index < elements.size() &&
-                query.query_element_with_metadata(elements[child_index], m).tag == QueryResult::FINISH) {
+            if (search_element(query, m, child_index)) {
                 return true;
             }
-            // reset the skip to zero so we continue iterating normally
+        }
+        else if (*skip > child.len()) {
+            skip = *skip - child.len() - 1;
+        }
+        else if (*skip == child.len()) {
+            // important to not be None so we never call query_node again
             skip = 0;
+            if (search_element(query, m, child_index)) {
+                return true;
+            }
+        }
+        else {
+            if (child.search(query, m, skip)) {
+                return true;
+            }
+            // important to not be None so we never call query_node again
+            skip = 0;
+            if (search_element(query, m, child_index)) {
+                return true;
+            }
         }
     }
     return false;

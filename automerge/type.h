@@ -138,6 +138,8 @@ struct Counter {
     s64 current = 0;
     usize increments = 0;
 
+    Counter(s64 _start = 0) : start(_start), current(_start), increments(0) {}
+
     bool operator==(const Counter& other) const {
         return (current == other.current);
     }
@@ -183,21 +185,9 @@ struct ScalarValue {
         return (tag == other.tag) && (data == other.data);
     }
 
-    std::optional<s64> to_s64() const {
-        switch (tag) {
-        case ScalarValue::Int:
-        case ScalarValue::Timestamp:
-            return std::get<s64>(data);
-        case ScalarValue::Uint:
-            return (s64)std::get<u64>(data);
-        case ScalarValue::F64:
-            return (s64)std::get<double>(data);
-        case ScalarValue::Counter:
-            return std::get<Counter>(data).current;
-        default:
-            return {};
-        }
-    }
+    std::optional<s64> to_s64() const;
+
+    std::string to_string() const;
 };
 
 ///////////////////////////////////////////////

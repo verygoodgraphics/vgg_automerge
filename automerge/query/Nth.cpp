@@ -21,12 +21,18 @@ Key Nth::key() {
 }
 
 QueryResult Nth::query_node(const OpTreeNode& child) {
+    // We note the number of values stored in / below the node `child`
     usize num_vis = child.index.visible_len();
-    if (last_seen && child.index.has_visible(*last_seen)) {
+    // Nodes are sorted by key (obj, prop, ?) and time. We can only see a key twice as
+    // visible if it is the last element and has a conflict and occurs as visible again in
+    // the next node. To prevent double-counting it, we subtract 1 (to pretend we didn't see
+    // it yet).
+    if (last_seen.has_value() && child.index.has_visible(*last_seen)) {
         --num_vis;
     }
 
     if (seen + num_vis > target) {
+        // Enter this node as the nth element is in this node
         return QueryResult{ QueryResult::DESCEND, 0 };
     }
 
@@ -40,9 +46,17 @@ QueryResult Nth::query_node(const OpTreeNode& child) {
     // - the insert was at a previous node and this is a long run of overwrites so last_seen should already be set correctly
     // - the visible op is in this node and the elemid references it so it can be set here
     // - the visible op is in a future node and so it will be counted as seen there
+    // Note: We also need to reset last_seen if it is set to something else than the last item
+    //   in the child. This means that the child contains an `insert` (so last_seen should
+    //   be reset to None), but no visible op (so last_seen should not be set to a new value)
+    //   The visible op also cannot be in a previous node, because then `last_seen` would
+    //   already be set to the same elemid as the last element in the child.
     auto last_elemid = child.last().elemid_or_key();
     if (child.index.has_visible(last_elemid)) {
         last_seen = last_elemid;
+    }
+    else if (last_seen.has_value() && !(last_elemid == *last_seen)) {
+        last_seen.reset();
     }
 
     return QueryResult{ QueryResult::NEXT, 0 };

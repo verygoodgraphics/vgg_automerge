@@ -58,9 +58,9 @@ std::vector<u8> deflate_compress(const BinSlice& data) {
 }
 
 std::vector<u8> deflate_decompress(const BinSlice& data) {
-    u8* decomp = new u8[data.second * 2]();
+    u8* decomp = new u8[data.second * 200]();
 
-    int n = sinflate(decomp, (int)data.second * 2, &(*data.first), (int)data.second);
+    int n = sinflate(decomp, (int)data.second * 200, &(*data.first), (int)data.second);
     std::vector<u8> res(std::make_move_iterator(decomp), std::make_move_iterator(decomp + n));
 
     delete[]decomp;

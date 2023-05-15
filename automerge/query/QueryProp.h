@@ -14,21 +14,13 @@
 #include "../Op.h"
 #include "../Query.h"
 
-struct Start {
-    // The index to start searching for in the optree
-    usize idx;
-    // The total length of the optree
-    usize optree_len;
-};
-
 struct QueryProp : public TreeQuery {
     Key key;
     std::vector<const Op*> ops;
     std::vector<usize> ops_pos;
     usize pos;
-    std::optional<Start> start;
 
-    QueryProp(usize prop) : key{ Key::Map, prop }, ops(), ops_pos(), pos(0), start() {}
+    QueryProp(usize prop) : key{ Key::Map, prop }, ops(), ops_pos(), pos(0) {}
 
     QueryResult query_node_with_metadata(const OpTreeNode& child, const OpSetMetadata& m);
 

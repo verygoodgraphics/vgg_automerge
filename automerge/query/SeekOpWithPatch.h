@@ -23,11 +23,9 @@ struct SeekOpWithPatch : public TreeQuery {
     std::optional<Key> last_seen;
     std::vector<const Op*> values;
     bool had_value_before;
-    // The found start position of the key if there is one yet (for map objects).
-    std::optional<usize> start;
 
     SeekOpWithPatch(const Op& _op) : op(_op), pos(0), succ(), found(false), seen(0),
-        last_seen(), values(), had_value_before(false), start() {}
+        last_seen(), values(), had_value_before(false) {}
 
     bool lesser_insert(const Op& op, const OpSetMetadata& m);
 

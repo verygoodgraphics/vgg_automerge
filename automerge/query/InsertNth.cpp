@@ -39,6 +39,9 @@ QueryResult InsertNth::query_node(const OpTreeNode& child) {
     if (child.index.has_visible(last_elemid)) {
         last_seen = last_elemid;
     }
+    else if (last_seen && !(last_elemid == *last_seen)) {
+        last_seen.reset();
+    }
 
     return QueryResult{ QueryResult::NEXT, 0 };
 }

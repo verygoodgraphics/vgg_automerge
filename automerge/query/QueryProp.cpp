@@ -5,37 +5,11 @@
 #include "../OpSet.h"
 
 QueryResult QueryProp::query_node_with_metadata(const OpTreeNode& child, const OpSetMetadata& m) {
-    if (start) {
-        if (pos + child.len() >= start->idx) {
-            // skip empty nodes
-            if (child.index.visible_len() == 0) {
-                if (pos + child.len() >= start->optree_len) {
-                    pos = start->optree_len;
-                    return QueryResult{ QueryResult::FINISH, 0 };
-                }
-                else {
-                    pos += child.len();
-                    return QueryResult{ QueryResult::NEXT, 0 };
-                }
-            }
-            else {
-                return QueryResult{ QueryResult::DESCEND, 0 };
-            }
-        }
-        else {
-            pos += child.len();
-            return QueryResult{ QueryResult::NEXT, 0 };
-        }
-    }
-    else {
-        // in the root node find the first op position for the key
-        usize new_start = binary_search_by(child, [&](const Op* op) {
-            return m.key_cmp(op->key, this->key);
-            });
-        start = Start{ new_start, child.len() };
-        pos = new_start;
-        return QueryResult{ QueryResult::SKIP, new_start };
-    }
+    auto start = binary_search_by(child, [&](const Op* op) {
+        return m.key_cmp(op->key, this->key);
+    });
+    pos = start;
+    return QueryResult{ QueryResult::SKIP, start };
 }
 
 QueryResult QueryProp::query_element(const Op& op) {

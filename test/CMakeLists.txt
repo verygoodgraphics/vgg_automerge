@@ -21,6 +21,10 @@ else()
 		automerge
 		GTest::gtest_main
 	)
+	add_custom_command(TARGET unit_test POST_BUILD
+		COMMAND "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_SOURCE_DIR}/test/fuzz-crashers" "${CMAKE_CURRENT_BINARY_DIR}/fuzz-crashers"
+		COMMAND "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_SOURCE_DIR}/test/fixtures" "${CMAKE_CURRENT_BINARY_DIR}/fixtures"
+	)
 
 	include(GoogleTest)
 	gtest_discover_tests(unit_test)

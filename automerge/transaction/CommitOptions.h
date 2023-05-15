@@ -14,6 +14,7 @@ struct CommitOptions {
     std::optional<s64> time;
     std::optional<Obs*> op_observer;
 
+    CommitOptions() = default;
     CommitOptions(std::optional<std::string>&& m, std::optional<s64>&& t, std::optional<Obs*>&& o)
         : message(std::move(m)), time(std::move(t)), op_observer(std::move(o)) {}
 };

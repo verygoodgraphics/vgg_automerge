@@ -71,6 +71,9 @@ struct TransactionInner {
     std::optional<OpId> local_list_op(Automerge& doc, ObjId& obj, usize index, OpType&& action);
 
     // throw AutomergeError
+    void increment(Automerge& doc, const ExId& ex_obj, Prop&& prop, s64 value);
+
+    // throw AutomergeError
     void delete_(Automerge& doc, const ExId& ex_obj, Prop&& prop);
 };
 
@@ -101,6 +104,9 @@ struct Transaction : public Transactable {
 
     // throw AutomergeError
     ExId insert_object(const ExId& obj, usize index, ObjType value) override;
+
+    // throw AutomergeError
+    void increment(const ExId& obj, Prop&& prop, s64 value) override;
 
     // throw AutomergeError
     void delete_(const ExId& obj, Prop&& prop) override;

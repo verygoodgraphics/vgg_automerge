@@ -163,6 +163,46 @@ int OpId::succ_ord(const OpId& other, const std::vector<usize>& actors) const {
     return 1;
 }
 
+std::optional<s64> ScalarValue::to_s64() const {
+    switch (tag) {
+    case ScalarValue::Int:
+    case ScalarValue::Timestamp:
+        return std::get<s64>(data);
+    case ScalarValue::Uint:
+        return (s64)std::get<u64>(data);
+    case ScalarValue::F64:
+        return (s64)std::get<double>(data);
+    case ScalarValue::Counter:
+        return std::get<Counter>(data).current;
+    default:
+        return {};
+    }
+}
+
+std::string ScalarValue::to_string() const {
+    switch (tag) {
+    case ScalarValue::Bytes:
+        return hex_to_string(make_bin_slice(std::get<std::vector<u8>>(data)));
+    case ScalarValue::Str:
+        return std::get<std::string>(data);
+    case ScalarValue::Int:
+    case ScalarValue::Timestamp:
+        return std::to_string(std::get<s64>(data));
+    case ScalarValue::Uint:
+        return std::to_string(std::get<u64>(data));
+    case ScalarValue::F64:
+        return std::to_string(std::get<double>(data));
+    case ScalarValue::Counter:
+        return std::to_string(std::get<Counter>(data).current);
+    case ScalarValue::Boolean:
+        return std::get<bool>(data) ? "true" : "false";
+    case ScalarValue::Null:
+        return "null";
+    default:
+        return {};
+    }
+}
+
 // TODO: need distinguish ObjId, ElemId from OpId
 Export::Export(const OpId& op) {
     if (op == ROOT) {

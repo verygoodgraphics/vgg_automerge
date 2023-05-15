@@ -23,10 +23,8 @@ struct SeekOp : public TreeQuery {
     std::vector<usize> succ;
     // whether a position has been found
     bool found;
-    // The found start position of the key if there is one yet (for map objects).
-    std::optional<usize> start;
 
-    SeekOp(const Op& _op) : op(_op), pos(0), succ(), found(false), start() {}
+    SeekOp(const Op& _op) : op(_op), pos(0), succ(), found(false) {}
 
     bool lesser_insert(const Op& op, const OpSetMetadata& m);
 

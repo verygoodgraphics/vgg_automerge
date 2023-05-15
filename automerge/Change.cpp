@@ -289,10 +289,10 @@ Change decode_change(std::vector<u8>&& _bytes) {
     auto [chunktype, body] = decode_header_without_hash({ _bytes.cbegin(), _bytes.size() });
     ChangeBytes bytes;
     if (chunktype == BLOCK_TYPE_DEFLATE) {
-        decompress_chunk({ 0, PREAMBLE_BYTES }, std::move(body), std::move(_bytes));
+        bytes = decompress_chunk({ 0, PREAMBLE_BYTES }, std::move(body), std::move(_bytes));
     }
     else {
-        bytes.isCompressed = true;
+        bytes.isCompressed = false;
         bytes.uncompressed = std::move(_bytes);
     }
     auto uncompressed = bytes.get_uncompressed();
@@ -346,13 +346,13 @@ ChangeBytes decompress_chunk(Range&& preamble, Range&& body, std::vector<u8>&& c
     auto decompressed = deflate_decompress({ compressed.cbegin() + body.first, body.second - body.first });
     std::vector<u8> result;
     result.reserve(decompressed.size() + (preamble.second - preamble.first));
-    result.insert(result.end(), compressed.begin() + preamble.first, compressed.begin() + preamble.second);
+    result.insert(result.end(), compressed.cbegin() + preamble.first, compressed.cbegin() + preamble.second);
     result.push_back(BLOCK_TYPE_CHANGE);
     Encoder encoder(result);
     encoder.encode((u64)decompressed.size());
     vector_extend(result, std::move(decompressed));
 
-    return { true, {}, std::move(result) };
+    return { true, std::move(compressed), std::move(result) };
 }
 
 std::vector<ChangeHash> decode_hashes(const BinSlice& bytes, Range& cursor) {
