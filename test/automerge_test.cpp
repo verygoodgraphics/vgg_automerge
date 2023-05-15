@@ -1614,36 +1614,139 @@ TEST_F(AutomergeTest, badChangeOnOptreeNodeBoundary) {
     EXPECT_NO_THROW(Automerge::load(make_bin_slice(doc2.save())));
 }
 
-// TODO: to be fixed #572
-//TEST_F(AutomergeTest, RegressionNthMiscount) {
-//    Automerge doc;
-//    (doc.transact_with(
-//        [](const std::vector<ExId>& result) { return CommitOptions<OpObserver>(); },
-//        [](Transaction& d)->std::vector<ExId> {
-//            auto list_id = d.put_object(ExId(), Prop("listval"), ObjType::List);
-//            for (usize i = 0; i < 30; ++i) {
-//                d.insert(list_id, i, ScalarValue{ ScalarValue::Null, {} });
-//                auto map = d.put_object(list_id, Prop(i), ObjType::Map);
-//                d.put(map, Prop("test"), ScalarValue{ ScalarValue::Int, (s64)i });
-//            }
-//            return {};
-//        }
-//    ));
-//
-//    auto ss = json(doc).dump(2);
-//
-//    for (usize i = 0; i < 30; ++i) {
-//        auto& [list_id, obj_type1] = doc.get(ExId(), Prop("listval")).value();
-//        EXPECT_EQ((Value{ Value::OBJECT, ObjType::List }), obj_type1);
-//
-//        auto& [map_id, obj_type2] = doc.get(list_id, Prop(i)).value();
-//        EXPECT_EQ((Value{ Value::OBJECT, ObjType::Map }), obj_type2);
-//
-//        auto& obj_type3 = doc.get(map_id, Prop("test"))->second;
-//        EXPECT_EQ((Value{ Value::SCALAR, ScalarValue{ ScalarValue::Int, (s64)i } }),
-//            obj_type3) << "on run " << i;
-//    }
-//}
+TEST_F(AutomergeTest, RegressionNthMiscount) {
+    Automerge doc;
+    EXPECT_NO_THROW(doc.transact_with(
+        [](const std::vector<ExId>& result) { return CommitOptions<OpObserver>(); },
+        [](Transaction& d)->std::vector<ExId> {
+            auto list_id = d.put_object(ExId(), Prop("listval"), ObjType::List);
+            for (usize i = 0; i < 30; ++i) {
+                d.insert(list_id, i, ScalarValue{ ScalarValue::Null, {} });
+                auto map = d.put_object(list_id, Prop(i), ObjType::Map);
+                d.put(map, Prop("test"), ScalarValue{ ScalarValue::Int, (s64)i });
+            }
+            return {};
+        }
+    ));
+
+    for (usize i = 0; i < 30; ++i) {
+        auto& [list_id, obj_type1] = doc.get(ExId(), Prop("listval")).value();
+        EXPECT_EQ((Value{ Value::OBJECT, ObjType::List }), obj_type1);
+
+        auto& [map_id, obj_type2] = doc.get(list_id, Prop(i)).value();
+        EXPECT_EQ((Value{ Value::OBJECT, ObjType::Map }), obj_type2);
+
+        auto& obj_type3 = doc.get(map_id, Prop("test"))->second;
+        EXPECT_EQ(
+            (Value{ Value::SCALAR, ScalarValue{ ScalarValue::Int, (s64)i } }),
+            obj_type3
+        ) << "on run " << i;
+    }
+}
+
+TEST_F(AutomergeTest, RegressionNthMiscountSmaller) {
+    Automerge doc;
+    EXPECT_NO_THROW(doc.transact_with(
+        [](const std::vector<ExId>& result) { return CommitOptions<OpObserver>(); },
+        [](Transaction& d)->std::vector<ExId> {
+            auto list_id = d.put_object(ExId(), Prop("listval"), ObjType::List);
+            for (usize i = 0; i < B * 4; ++i) {
+                d.insert(list_id, i, ScalarValue{ ScalarValue::Null, {} });
+                d.put(list_id, Prop(i), ScalarValue{ ScalarValue::Int, (s64)i });
+            }
+            return {};
+        }
+    ));
+
+    for (usize i = 0; i < B * 4; ++i) {
+        auto& [list_id, obj_type1] = doc.get(ExId(), Prop("listval")).value();
+        EXPECT_EQ((Value{ Value::OBJECT, ObjType::List }), obj_type1);
+
+        auto& obj_type2 = doc.get(list_id, Prop(i))->second;
+        EXPECT_EQ(
+            (Value{ Value::SCALAR, ScalarValue{ ScalarValue::Int, (s64)i } }),
+            obj_type2
+        ) << "on run " << i;
+    }
+}
+
+TEST_F(AutomergeTest, RegressionInsertOpid) {
+    Automerge doc;
+
+    auto list_id = doc.put_object(ExId(), Prop("list"), ObjType::List);
+    doc.commit();
+
+    auto change1 = doc.get_last_local_change();
+
+    for (usize i = 0; i < 30; ++i) {
+        doc.insert(list_id, i, ScalarValue{ ScalarValue::Null, {} });
+        doc.put(list_id, Prop(i), ScalarValue{ ScalarValue::Int, (s64)i });
+    }
+    doc.commit();
+
+    auto change2 = doc.get_last_local_change();
+
+    Automerge new_doc;
+    new_doc.apply_changes_with(std::vector{ std::move(*change1) }, {});
+    new_doc.apply_changes_with(std::vector{ std::move(*change2) }, {});
+
+    for (usize i = 0; i < 30; ++i) {
+        auto& [_1, doc_val] = doc.get(list_id, Prop(i)).value();
+        auto& [_2, new_doc_val] = new_doc.get(list_id, Prop(i)).value();
+
+        EXPECT_EQ(
+            (Value{ Value::SCALAR, ScalarValue{ ScalarValue::Int, (s64)i } }),
+            doc_val
+        ) << "doc_val on run " << i;
+        EXPECT_EQ(
+            (Value{ Value::SCALAR, ScalarValue{ ScalarValue::Int, (s64)i } }),
+            new_doc_val
+        ) << "new_doc_val on run " << i;
+    }
+
+    // TODO: patch not implement
+}
+
+TEST_F(AutomergeTest, BigList) {
+    Automerge doc;
+
+    auto list_id = doc.put_object(ExId(), Prop("list"), ObjType::List);
+    doc.commit();
+
+    auto change1 = doc.get_last_local_change();
+
+    for (usize i = 0; i < B; ++i) {
+        doc.insert(list_id, i, ScalarValue{ ScalarValue::Null, {} });
+    }
+    for (usize i = 0; i < B; ++i) {
+        doc.put_object(list_id, Prop(i), ObjType::Map);
+    }
+    doc.commit();
+
+    auto change2 = doc.get_last_local_change();
+
+    Automerge new_doc;
+    new_doc.apply_changes_with(std::vector{ std::move(*change1) }, {});
+    new_doc.apply_changes_with(std::vector{ std::move(*change2) }, {});
+
+    for (usize i = 0; i < B; ++i) {
+        auto& [_1, doc_val] = doc.get(list_id, Prop(i)).value();
+        auto& [_2, new_doc_val] = new_doc.get(list_id, Prop(i)).value();
+
+        EXPECT_EQ(
+            (Value{ Value::OBJECT, ObjType::Map }),
+            doc_val
+        ) << "doc_val on run " << i;
+        EXPECT_EQ(
+            (Value{ Value::OBJECT, ObjType::Map }),
+            new_doc_val
+        ) << "new_doc_val on run " << i;
+    }
+
+    // TODO: patch not implement
+}
+
+// TODO: mark not implement
 
 /////////////////////////////////////////////////////////
 // automerge/src/sync.rs
@@ -1980,7 +2083,7 @@ TEST_F(SyncTest, ShouldHandleLotsOfBranchingAndMerging) {
         auto change2 = doc2.get_last_local_change();
         ASSERT_TRUE(change2.has_value());
 
-        ASSERT_NO_THROW(doc1.apply_changes(std::vector{ std::move(*change2) }));
+        ASSERT_NO_THROW(doc1.apply_changes(std::vector{ *change2 }));
         ASSERT_NO_THROW(doc2.apply_changes(std::vector{ std::move(*change1) }));
     }
 

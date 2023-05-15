@@ -21,9 +21,9 @@ void SeekOpWithPatch::cout_visible(const Op& e) {
         return;
     }
     if (e.insert) {
-        last_seen = {};
+        last_seen.reset();
     }
-    if (e.visible() && !last_seen) {
+    if (e.visible() && !last_seen.has_value()) {
         ++seen;
         last_seen = e.elemid_or_key();
     }
@@ -36,33 +36,11 @@ QueryResult SeekOpWithPatch::query_node_with_metadata(const OpTreeNode& child, c
 
     // Updating a map: operations appear in sorted order by key
     if (op.key.tag == Key::Map) {
-        if (start) {
-            if (pos + child.len() >= *start) {
-                // skip empty nodes
-                if (child.index.visible_len() == 0) {
-                    pos += child.len();
-                    return QueryResult{ QueryResult::NEXT, 0 };
-                }
-                else {
-                    return QueryResult{ QueryResult::DESCEND, 0 };
-                }
-            }
-            else {
-                pos += child.len();
-                return QueryResult{ QueryResult::NEXT, 0 };
-            }
-        }
-        else {
-            // in the root node find the first op position for the key
-            // Search for the place where we need to insert the new operation. First find the
-            // first op with a key >= the key we're updating
-            usize new_start = binary_search_by(child, [&](const Op* op) {
-                return m.key_cmp(op->key, this->op.key);
-                });
-            start = new_start;
-            pos = new_start;
-            return QueryResult{ QueryResult::SKIP, new_start };
-        }
+        auto start = binary_search_by(child, [&](const Op* op) {
+            return m.key_cmp(op->key, this->op.key);
+        });
+        pos = start;
+        return QueryResult{ QueryResult::SKIP, start };
     }
     // Special case for insertion at the head of the list (`e == HEAD` is only possible for
     // an insertion operation). Skip over any list elements whose elemId is greater than
@@ -93,13 +71,28 @@ QueryResult SeekOpWithPatch::query_node_with_metadata(const OpTreeNode& child, c
             // split across two tree nodes. To avoid double-counting in this situation, we
             // subtract one if the last visible element also appears in this tree node.
             usize num_vis = child.index.visible_len();
-            if (num_vis > 0) {
-                if (last_seen && child.index.has_visible(*last_seen)) {
-                    --num_vis;
-                }
-                seen += num_vis;
+            if (last_seen.has_value() && child.index.has_visible(*last_seen)) {
+                --num_vis;
+            }
+            seen += num_vis;
 
-                last_seen = child.last().elemid_or_key();
+            // We have updated seen by the number of visible elements in this index, before we skip it.
+            // We also need to keep track of the last elemid that we have seen (and counted as seen).
+            // We can just use the elemid of the last op in this node as either:
+            // - the insert was at a previous node and this is a long run of overwrites so last_seen should already be set correctly
+            // - the visible op is in this node and the elemid references it so it can be set here
+            // - the visible op is in a future node and so it will be counted as seen there
+            // Note: We also need to reset last_seen if it is set to something else than the last item
+            //   in the child. This means that the child contains an `insert` (so last_seen should
+            //   be reset to None), but no visible op (so last_seen should not be set to a new value)
+            //   The visible op also cannot be in a previous node, because then `last_seen` would
+            //   already be set to the same elemid as the last element in the child.
+            auto last_elemid = child.last().elemid_or_key();
+            if (child.index.has_visible(last_elemid)) {
+                last_seen = last_elemid;
+            }
+            else if (last_seen.has_value() && !(last_elemid == *last_seen)) {
+                last_seen.reset();
             }
 
             return QueryResult{ QueryResult::NEXT, 0 };

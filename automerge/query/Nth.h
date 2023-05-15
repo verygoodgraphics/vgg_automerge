@@ -14,6 +14,8 @@
 #include "../Op.h"
 #include "../Query.h"
 
+// The Nth query walks the tree to find the n-th Node. It skips parts of the tree where it knows
+// that the nth node can not be in them
 struct Nth : public TreeQuery {
     usize target;
     usize seen;

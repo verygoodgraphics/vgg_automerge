@@ -57,7 +57,9 @@ public:
     std::vector<OpTreeNode> children;
     std::vector<Op> elements;
     Index index;
-
+    
+    bool search_element(TreeQuery& query, const OpSetMetadata& m, usize index) const;
+    
     bool search(TreeQuery& query, const OpSetMetadata& m, std::optional<usize> skip) const;
 
     usize len() const {
