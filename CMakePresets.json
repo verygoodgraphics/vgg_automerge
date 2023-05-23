@@ -101,6 +101,14 @@
             }
         },
         {
+            "name": "linux-clang-release",
+            "displayName": "Linux Clang Release",
+            "inherits": "linux-clang-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
             "name": "macos-debug",
             "displayName": "macOS Debug",
             "generator": "Ninja",

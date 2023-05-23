@@ -1339,7 +1339,7 @@ TEST_F(AutomergeTest, TestCompressedChanges) {
     doc.put(ExId(), Prop("bytes"), ScalarValue{ ScalarValue::Bytes, std::vector<u8>(300, 10) });
     doc.commit();
     
-    Change change = doc.get_last_local_change().value();
+    Change change = std::move(doc.get_last_local_change().value());
     auto& bytes = change.bytes;
     EXPECT_TRUE(bytes.uncompressed.size() > DEFLATE_MIN_SIZE);
 
@@ -1630,13 +1630,13 @@ TEST_F(AutomergeTest, RegressionNthMiscount) {
     ));
 
     for (usize i = 0; i < 30; ++i) {
-        auto& [list_id, obj_type1] = doc.get(ExId(), Prop("listval")).value();
+        auto [list_id, obj_type1] = std::move(doc.get(ExId(), Prop("listval")).value());
         EXPECT_EQ((Value{ Value::OBJECT, ObjType::List }), obj_type1);
 
-        auto& [map_id, obj_type2] = doc.get(list_id, Prop(i)).value();
+        auto [map_id, obj_type2] = std::move(doc.get(list_id, Prop(i)).value());
         EXPECT_EQ((Value{ Value::OBJECT, ObjType::Map }), obj_type2);
 
-        auto& obj_type3 = doc.get(map_id, Prop("test"))->second;
+        auto obj_type3 = std::move(doc.get(map_id, Prop("test"))->second);
         EXPECT_EQ(
             (Value{ Value::SCALAR, ScalarValue{ ScalarValue::Int, (s64)i } }),
             obj_type3
@@ -1659,10 +1659,10 @@ TEST_F(AutomergeTest, RegressionNthMiscountSmaller) {
     ));
 
     for (usize i = 0; i < B * 4; ++i) {
-        auto& [list_id, obj_type1] = doc.get(ExId(), Prop("listval")).value();
+        auto [list_id, obj_type1] = std::move(doc.get(ExId(), Prop("listval")).value());
         EXPECT_EQ((Value{ Value::OBJECT, ObjType::List }), obj_type1);
 
-        auto& obj_type2 = doc.get(list_id, Prop(i))->second;
+        auto obj_type2 = std::move(doc.get(list_id, Prop(i))->second);
         EXPECT_EQ(
             (Value{ Value::SCALAR, ScalarValue{ ScalarValue::Int, (s64)i } }),
             obj_type2
@@ -1691,8 +1691,8 @@ TEST_F(AutomergeTest, RegressionInsertOpid) {
     new_doc.apply_changes_with(std::vector{ std::move(*change2) }, {});
 
     for (usize i = 0; i < 30; ++i) {
-        auto& [_1, doc_val] = doc.get(list_id, Prop(i)).value();
-        auto& [_2, new_doc_val] = new_doc.get(list_id, Prop(i)).value();
+        auto [_1, doc_val] = std::move(doc.get(list_id, Prop(i)).value());
+        auto [_2, new_doc_val] = std::move(new_doc.get(list_id, Prop(i)).value());
 
         EXPECT_EQ(
             (Value{ Value::SCALAR, ScalarValue{ ScalarValue::Int, (s64)i } }),
@@ -1730,8 +1730,8 @@ TEST_F(AutomergeTest, BigList) {
     new_doc.apply_changes_with(std::vector{ std::move(*change2) }, {});
 
     for (usize i = 0; i < B; ++i) {
-        auto& [_1, doc_val] = doc.get(list_id, Prop(i)).value();
-        auto& [_2, new_doc_val] = new_doc.get(list_id, Prop(i)).value();
+        auto [_1, doc_val] = std::move(doc.get(list_id, Prop(i)).value());
+        auto [_2, new_doc_val] = std::move(new_doc.get(list_id, Prop(i)).value());
 
         EXPECT_EQ(
             (Value{ Value::OBJECT, ObjType::Map }),
