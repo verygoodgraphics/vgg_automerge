@@ -10,7 +10,7 @@
 #include "helper.h"
 
 OpTreeIter::OpTreeIter(const OpTreeInternal& tree) {
-    if (!tree.root_node) {
+    if (!tree.root_node.has_value()) {
         is_emtpy = true;
         return;
     }
@@ -571,7 +571,7 @@ std::optional<const Op*> OpTreeNode::get(usize index) const {
 //////////////////////////////////////////////////////
 
 TreeQuery& OpTreeInternal::search(TreeQuery& query, const OpSetMetadata& m) const {
-    if (!root_node)
+    if (!root_node.has_value())
         return query;
 
     auto res = query.query_node_with_metadata(*root_node, m);
@@ -589,7 +589,7 @@ void OpTreeInternal::insert(usize index, Op&& element) {
     assert(index <= len());
 
     usize old_len = len();
-    if (!root_node) {
+    if (!root_node.has_value()) {
         OpTreeNode root;
         root.insert_into_non_full_node(index, std::move(element));
         root_node = root;
@@ -639,7 +639,7 @@ void OpTreeInternal::insert(usize index, Op&& element) {
 
 void OpTreeInternal::update(usize index, OpFunc f) {
     if (len() > index) {
-        if (!root_node) {
+        if (!root_node.has_value()) {
             throw std::runtime_error("update from empty tree");
         }
 
@@ -648,7 +648,7 @@ void OpTreeInternal::update(usize index, OpFunc f) {
 }
 
 Op OpTreeInternal::remove(usize index) {
-    if (!root_node) {
+    if (!root_node.has_value()) {
         throw std::runtime_error("remove from empty tree");
     }
 

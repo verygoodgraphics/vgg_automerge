@@ -102,7 +102,7 @@ public:
 
         std::optional<T> res;
         Decoding::decode(buf, res);
-        if (!res) {
+        if (!res.has_value()) {
             //throw std::runtime_error("NoDecodedValue");
             return {};
         }
@@ -170,7 +170,7 @@ struct RleDecoder {
             }
 
             auto res = decoder.read<s64>();
-            if (!res) {
+            if (!res.has_value()) {
                 // warning
                 return {};
             }

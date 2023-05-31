@@ -396,7 +396,7 @@ private:
     std::optional<Transaction> _transaction = {};
 
     void ensure_transaction_open() {
-        if (!_transaction) {
+        if (!_transaction.has_value()) {
             _transaction = transaction();
         }
     }

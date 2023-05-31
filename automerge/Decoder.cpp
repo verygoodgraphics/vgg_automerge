@@ -44,7 +44,7 @@ void Decoding::decode_s64(BinSlice& bytes, std::optional<s64>& val) {
 void Decoding::decode(BinSlice& bytes, std::optional<std::vector<u8>>& val) {
     std::optional<usize> len;
     decode_usize(bytes, len);
-    if (!len) {
+    if (!len.has_value()) {
         val.reset();
         return;
     }
@@ -68,7 +68,7 @@ void Decoding::decode(BinSlice& bytes, std::optional<std::string>& val) {
     std::optional<std::vector<u8>> result;
     decode(bytes, result);
 
-    if (!result) {
+    if (!result.has_value()) {
         val.reset();
     }
     else {
@@ -80,7 +80,7 @@ void Decoding::decode(BinSlice& bytes, std::optional<std::optional<std::string>>
     std::optional<std::vector<u8>> result;
     decode(bytes, result);
 
-    if (!result) {
+    if (!result.has_value()) {
         val.reset();
     }
     else if (result->empty()) {
@@ -192,7 +192,7 @@ void Decoding::decode(BinSlice& bytes, std::optional<ActorId>& val) {
     std::optional<std::vector<u8>> result;
     decode(bytes, result);
 
-    if (!result) {
+    if (!result.has_value()) {
         val.reset();
     }
     else {
@@ -298,7 +298,7 @@ std::optional<bool> BooleanDecoder::next() {
         }
 
         auto res = decoder.read<usize>();
-        if (!res) {
+        if (!res.has_value()) {
             count = 0;
         }
         else {
@@ -314,10 +314,10 @@ std::optional<bool> BooleanDecoder::next() {
 
 std::optional<std::optional<u64>> DeltaDecoder::next() {
     auto delta = rle.next();
-    if (!delta) {
+    if (!delta.has_value()) {
         return {};
     }
-    if (!(*delta)) {
+    if (!(*delta).has_value()) {
         return std::optional<u64>();
     }
 

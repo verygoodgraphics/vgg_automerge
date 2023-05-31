@@ -12,6 +12,7 @@ FetchContent_MakeAvailable(googlebenchmark)
 
 add_executable(benchmark_test
     "sync.cpp"
+    "map.cpp"
 )
 target_link_libraries(benchmark_test PRIVATE
     automerge
@@ -20,5 +21,5 @@ target_link_libraries(benchmark_test PRIVATE
 
 # Link Shlwapi to the project
 if ("${CMAKE_SYSTEM_NAME}" MATCHES "Windows")
-    target_link_libraries(benchmark_test Shlwapi)
+    target_link_libraries(benchmark_test PRIVATE Shlwapi)
 endif()

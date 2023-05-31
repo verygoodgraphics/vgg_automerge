@@ -268,7 +268,7 @@ Range read_leb128(BinSlice& bytes) {
     std::optional<usize> val;
 
     Decoding::decode(buf, val);
-    if (!val) {
+    if (!val.has_value()) {
         throw std::overflow_error("decode u64");
     }
 
@@ -474,7 +474,7 @@ std::vector<BinSlice> split_blocks(const BinSlice& bytes) {
     BinSlice cursor = bytes;
     while (true) {
         auto block = pop_block(cursor);
-        if (!block) {
+        if (!block.has_value()) {
             break;
         }
 
@@ -558,7 +558,7 @@ std::vector<Change> decode_document(const BinSlice& bytes) {
        let changes = compress_doc_changes(uncompressed_changes, doc_changes_deps, doc_changes_len).ok_or(decoding::Error::NoDocChanges) ? ;
     */
     auto changes = compress_doc_changes(std::move(doc_changes), std::move(doc_changes_deps), doc_changes_len, actors);
-    if (!changes) {
+    if (!changes.has_value()) {
         throw std::runtime_error("no doc changes");
     }
 
@@ -653,7 +653,7 @@ std::optional<std::vector<Change>> compress_doc_changes(std::vector<DocChange>&&
 
     for (auto& doc_change : uncompressed_changes) {
         auto deps = doc_changes_deps.next();
-        if (!deps) {
+        if (!deps.has_value()) {
             throw std::runtime_error("num not match");
         }
 

@@ -10,15 +10,15 @@
 
 std::optional<OldObjectId> ObjIterator::next() {
     auto actor_next = actor.next();
-    if (!actor_next) {
+    if (!actor_next.has_value()) {
         return {};
     }
     auto ctr_next = ctr.next();
-    if (!ctr_next) {
+    if (!ctr_next.has_value()) {
         return {};
     }
 
-    if (!(*actor_next) || !(*ctr_next)) {
+    if (!(*actor_next).has_value() || !(*ctr_next).has_value()) {
         return OldObjectId(true);
     };
 
@@ -36,7 +36,7 @@ DepsIterator::DepsIterator(const BinSlice& bytes, const std::unordered_map<u32, 
 
 std::optional<std::vector<usize>> DepsIterator::next() {
     auto num_next = num.next();
-    if (!num_next || !*num_next) {
+    if (!num_next.has_value() || !(*num_next).has_value()) {
         return {};
     }
 
@@ -44,7 +44,7 @@ std::optional<std::vector<usize>> DepsIterator::next() {
     p.reserve(**num_next);
     for (usize i = 0; i < **num_next; ++i) {
         auto dep_next = dep.next();
-        if (!dep_next || !*dep_next) {
+        if (!dep_next.has_value() || !(*dep_next).has_value()) {
             return {};
         }
 
@@ -56,27 +56,27 @@ std::optional<std::vector<usize>> DepsIterator::next() {
 
 std::optional<OldKey> KeyIterator::next() {
     auto actor_next = actor.next();
-    if (!actor_next) {
+    if (!actor_next.has_value()) {
         return {};
     }
     auto ctr_next = ctr.next();
-    if (!ctr_next) {
+    if (!ctr_next.has_value()) {
         return {};
     }
     auto str_next = str.next();
-    if (!str_next) {
+    if (!str_next.has_value()) {
         return {};
     }
 
-    if (!*actor_next && !*ctr_next && *str_next) {
+    if (!(*actor_next).has_value() && !(*ctr_next).has_value() && (*str_next).has_value()) {
         return OldKey{ OldKey::MAP, **str_next };
     }
 
-    if (!*actor_next && *ctr_next && !*str_next && **ctr_next == 0) {
+    if (!(*actor_next).has_value() && (*ctr_next).has_value() && !(*str_next).has_value() && **ctr_next == 0) {
         return OldKey::head();
     }
 
-    if (*actor_next && *ctr_next && !*str_next) {
+    if ((*actor_next).has_value() && (*ctr_next).has_value() && !(*str_next).has_value()) {
         if (**actor_next >= actors->size()) {
             return {};
         }
@@ -88,16 +88,16 @@ std::optional<OldKey> KeyIterator::next() {
 
 std::optional<ScalarValue> ValueIterator::next() {
     auto val_len_next = val_len.next();
-    if (!val_len_next || !*val_len_next) {
+    if (!val_len_next.has_value() || !(*val_len_next).has_value()) {
         return {};
     }
     auto val_type = **val_len_next;
     auto actor_next = actor.next();
-    if (!actor_next) {
+    if (!actor_next.has_value()) {
         return {};
     }
     auto ctr_next = ctr.next();
-    if (!ctr_next) {
+    if (!ctr_next.has_value()) {
         return {};
     }
 
@@ -116,7 +116,7 @@ std::optional<ScalarValue> ValueIterator::next() {
     usize len = val_type >> 4;
     if ((val_type % 16 >= VALUE_TYPE_MIN_UNKNOWN) && (val_type % 16 <= VALUE_TYPE_MAX_UNKNOWN)) {
         auto data = val_raw.read_bytes(len);
-        if (!data) {
+        if (!data.has_value()) {
             return {};
         }
         throw std::runtime_error("unimplemented");
@@ -125,7 +125,7 @@ std::optional<ScalarValue> ValueIterator::next() {
     switch (val_type % 16) {
     case VALUE_TYPE_COUNTER: {
         auto val = val_raw.read<s64>();
-        if (!val) {
+        if (!val.has_value()) {
             return {};
         }
         if (len != val_raw.last_read) {
@@ -135,7 +135,7 @@ std::optional<ScalarValue> ValueIterator::next() {
     }
     case VALUE_TYPE_TIMESTAMP: {
         auto val = val_raw.read<s64>();
-        if (!val) {
+        if (!val.has_value()) {
             return {};
         }
         if (len != val_raw.last_read) {
@@ -145,7 +145,7 @@ std::optional<ScalarValue> ValueIterator::next() {
     }
     case VALUE_TYPE_LEB128_UINT: {
         auto val = val_raw.read<u64>();
-        if (!val) {
+        if (!val.has_value()) {
             return {};
         }
         if (len != val_raw.last_read) {
@@ -155,7 +155,7 @@ std::optional<ScalarValue> ValueIterator::next() {
     }
     case VALUE_TYPE_LEB128_INT: {
         auto val = val_raw.read<s64>();
-        if (!val) {
+        if (!val.has_value()) {
             return {};
         }
         if (len != val_raw.last_read) {
@@ -165,14 +165,14 @@ std::optional<ScalarValue> ValueIterator::next() {
     }
     case VALUE_TYPE_UTF8: {
         auto data = val_raw.read_bytes(len);
-        if (!data) {
+        if (!data.has_value()) {
             return {};
         }
         return ScalarValue{ ScalarValue::Str, std::string(data->first, data->first + data->second) };
     }
     case VALUE_TYPE_BYTES: {
         auto data = val_raw.read_bytes(len);
-        if (!data) {
+        if (!data.has_value()) {
             return {};
         }
         return ScalarValue{ ScalarValue::Bytes, std::vector<u8>(data->first, data->first + data->second) };
@@ -181,7 +181,7 @@ std::optional<ScalarValue> ValueIterator::next() {
         if (len == 8) {
             // confirm only 8 bytes read
             auto val = val_raw.read<double>();
-            if (!val) {
+            if (!val.has_value()) {
                 return {};
             }
             return ScalarValue{ ScalarValue::F64, *val };
@@ -197,7 +197,7 @@ std::optional<ScalarValue> ValueIterator::next() {
 
 std::optional<std::vector<OldOpId>> PredIterator::next() {
     auto num = pred_num.next();
-    if (!num || !*num) {
+    if (!num.has_value() || !(*num).has_value()) {
         return {};
     }
 
@@ -205,11 +205,11 @@ std::optional<std::vector<OldOpId>> PredIterator::next() {
     p.reserve(**num);
     for (usize i = 0; i < **num; i++) {
         auto actor = pred_actor.next();
-        if (!actor || !*actor) {
+        if (!actor.has_value() || !(*actor).has_value()) {
             return {};
         }
         auto ctr = pred_ctr.next();
-        if (!ctr || !*ctr) {
+        if (!ctr.has_value() || !(*ctr).has_value()) {
             return {};
         }
         if (**actor >= actors->size()) {
@@ -226,7 +226,7 @@ std::optional<std::vector<OldOpId>> PredIterator::next() {
 
 std::optional<std::vector<OpId>> SuccIterator::next() {
     auto num = succ_num.next();
-    if (!num || !*num) {
+    if (!num.has_value() || !(*num).has_value()) {
         return {};
     }
 
@@ -234,11 +234,11 @@ std::optional<std::vector<OpId>> SuccIterator::next() {
     p.reserve(**num);
     for (usize i = 0; i < **num; i++) {
         auto actor = succ_actor.next();
-        if (!actor || !*actor) {
+        if (!actor.has_value() || !(*actor).has_value()) {
             return {};
         }
         auto ctr = succ_ctr.next();
-        if (!ctr || !*ctr) {
+        if (!ctr.has_value() || !(*ctr).has_value()) {
             return {};
         }
 
@@ -250,13 +250,13 @@ std::optional<std::vector<OpId>> SuccIterator::next() {
 
 std::optional<std::vector<u8>> ExtraIterator::next() {
     auto v = len.next();
-    if (!v || !*v) {
+    if (!v.has_value() || !(*v).has_value()) {
         return {};
     }
 
     usize len = **v >> 4;
     auto bytes = extra.read_bytes(len);
-    if (!bytes) {
+    if (!bytes.has_value()) {
         return {};
     }
 
@@ -302,27 +302,27 @@ OperationIterator::OperationIterator(const BinSlice& bytes, const std::vector<Ac
 
 std::optional<OldOp> OperationIterator::next() {
     auto action_next = action.next();
-    if (!action_next || !*action_next) {
+    if (!action_next.has_value() || !(*action_next).has_value()) {
         return {};
     }
     auto insert_next = insert.next();
-    if (!insert_next) {
+    if (!insert_next.has_value()) {
         return {};
     }
     auto obj = objs.next();
-    if (!obj) {
+    if (!obj.has_value()) {
         return {};
     }
     auto key = keys.next();
-    if (!key) {
+    if (!key.has_value()) {
         return {};
     }
     auto pred_next = pred.next();
-    if (!pred_next) {
+    if (!pred_next.has_value()) {
         return {};
     }
     auto value_next = value.next();
-    if (!value_next) {
+    if (!value_next.has_value()) {
         return {};
     }
 
@@ -348,7 +348,7 @@ std::optional<OldOp> OperationIterator::next() {
         break;
     case Action::Inc: {
         auto num = value_next->to_s64();
-        if (!num) {
+        if (!num.has_value()) {
             return {};
         }
         act = { OpType::Increment, *num };
@@ -416,35 +416,35 @@ DocOpIterator::DocOpIterator(const BinSlice& bytes, const std::vector<ActorId>& 
 
 std::optional<DocOp> DocOpIterator::next() {
     auto action_next = action.next();
-    if (!action_next || !*action_next) {
+    if (!action_next.has_value() || !(*action_next).has_value()) {
         return {};
     }
     auto actor_next = actor.next();
-    if (!actor_next || !*actor_next) {
+    if (!actor_next.has_value() || !(*actor_next).has_value()) {
         return {};
     }
     auto ctr_next = ctr.next();
-    if (!ctr_next || !*ctr_next) {
+    if (!ctr_next.has_value() || !(*ctr_next).has_value()) {
         return {};
     }
     auto insert_next = insert.next();
-    if (!insert_next) {
+    if (!insert_next.has_value()) {
         return {};
     }
     auto obj = objs.next();
-    if (!obj) {
+    if (!obj.has_value()) {
         return {};
     }
     auto key = keys.next();
-    if (!key) {
+    if (!key.has_value()) {
         return {};
     }
     auto succ_next = succ.next();
-    if (!succ_next) {
+    if (!succ_next.has_value()) {
         return {};
     }
     auto value_next = value.next();
-    if (!value_next) {
+    if (!value_next.has_value()) {
         return {};
     }
 
@@ -470,7 +470,7 @@ std::optional<DocOp> DocOpIterator::next() {
         break;
     case Action::Inc: {
         auto num = value_next->to_s64();
-        if (!num) {
+        if (!num.has_value()) {
             return {};
         }
         act = { OpType::Increment, *num };
@@ -516,23 +516,23 @@ ChangeIterator::ChangeIterator(const BinSlice& bytes, const std::unordered_map<u
 
 std::optional<DocChange> ChangeIterator::next() {
     auto actor_next = actor.next();
-    if (!actor_next || !*actor_next) {
+    if (!actor_next.has_value() || !(*actor_next).has_value()) {
         return {};
     }
     auto seq_next = seq.next();
-    if (!seq_next || !*seq_next) {
+    if (!seq_next.has_value() || !(*seq_next).has_value()) {
         return {};
     }
     auto max_op_next = max_op.next();
-    if (!max_op_next || !*max_op_next) {
+    if (!max_op_next.has_value() || !(*max_op_next).has_value()) {
         return {};
     }
     auto time_next = time.next();
-    if (!time_next || !*time_next) {
+    if (!time_next.has_value() || !(*time_next).has_value()) {
         return {};
     }
     auto message_next = message.next();
-    if (!message_next) {
+    if (!message_next.has_value()) {
         return {};
     }
     auto extra_next = extra.next();
@@ -932,7 +932,7 @@ std::pair<std::vector<u8>, std::vector<u8>> ChangeEncoder::finish() {
 void DocOpEncoder::encode(OpSetIter& ops, const std::vector<usize>& actors, const std::vector<std::string>& props) {
     while (true) {
         auto ops_next = ops.next();
-        if (!ops_next) {
+        if (!ops_next.has_value()) {
             break;
         }
         auto obj = ops_next->first;

@@ -121,7 +121,7 @@ void ChangeGraph::traverse_ancestors(
 
         // fn parents
         auto edge_idx = nodes[idx].parents;
-        while (!edge_idx) {
+        while (edge_idx.has_value()) {
             auto& edge = edges[*edge_idx];
             edge_idx = edge.next;
             to_visit.push_back(edge.target);

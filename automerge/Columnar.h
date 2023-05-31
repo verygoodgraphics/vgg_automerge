@@ -378,7 +378,9 @@ T col_iter(const BinSlice& bytes, const std::unordered_map<u32, Range>& ops, u32
 
     range = ops.find(col_id | COLUMN_TYPE_DEFLATE);
     if (range != ops.end()) {
-        return T(deflate_decompress(bytes));
+        return T(deflate_decompress(
+            std::make_pair(bytes.first + range->second.first, range->second.second - range->second.first)
+        ));
     }
 
     // empty data

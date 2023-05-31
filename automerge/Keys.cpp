@@ -5,12 +5,12 @@
 #include "Automerge.h"
 
 std::optional<std::string> Keys::next() {
-    if (!keys) {
+    if (!keys.has_value()) {
         return {};
     }
 
     auto key = keys->next();
-    if (!key) {
+    if (!key.has_value()) {
         return {};
     }
 
@@ -19,7 +19,7 @@ std::optional<std::string> Keys::next() {
 
 std::optional<std::string> Keys::next_back() {
     auto key = keys->next_back();
-    if (!key) {
+    if (!key.has_value()) {
         return {};
     }
 

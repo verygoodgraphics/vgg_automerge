@@ -27,22 +27,22 @@ std::optional<BloomFilter> BloomFilter::parse(const BinSlice& bytes) {
     Decoder decoder(bytes);
 
     auto num_entries = decoder.read<u32>();
-    if (!num_entries) {
+    if (!num_entries.has_value()) {
         return {};
     }
 
     auto num_bits_per_entry = decoder.read<u32>();
-    if (!num_bits_per_entry) {
+    if (!num_bits_per_entry.has_value()) {
         return {};
     }
 
     auto num_probes = decoder.read<u32>();
-    if (!num_probes) {
+    if (!num_probes.has_value()) {
         return {};
     }
 
     auto bits = decoder.read_bytes(bits_capacity(*num_entries, *num_bits_per_entry));
-    if (!bits) {
+    if (!bits.has_value()) {
         return {};
     }
 

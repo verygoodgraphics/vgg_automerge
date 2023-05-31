@@ -27,7 +27,7 @@ std::optional<std::pair<const ObjId*, const Op*>> OpSetIter::next() {
 
     while (true) {
         auto tree_next = trees.next();
-        if (!tree_next) {
+        if (!tree_next.has_value()) {
             return {};
         }
 
@@ -90,12 +90,12 @@ OpSetIter OpSetInternal::iter() const {
 }
 
 std::optional<std::pair<ObjId, Key>> OpSetInternal::parent_object(const ObjId& obj) const {
-    if (trees.count(obj) == 0 || !trees.at(obj).parent)
+    if (trees.count(obj) == 0 || !trees.at(obj).parent.has_value())
         return std::nullopt;
     auto& parent = *(trees.at(obj).parent);
     auto query = OpIdSearch(obj);
     auto& key = static_cast<OpIdSearch&>(search(parent, query)).key;
-    if (!key) {
+    if (!key.has_value()) {
         throw std::runtime_error("not found");
     }
 

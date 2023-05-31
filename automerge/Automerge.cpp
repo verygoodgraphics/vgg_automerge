@@ -150,7 +150,7 @@ std::pair<ObjId, ObjType> Automerge::exid_to_obj(const ExId& id) const {
     }
     else {
         auto res = ops.m.actors.lookup(actor);
-        if (!res) {
+        if (!res.has_value()) {
             throw AutomergeError{ AutomergeError::Fail, (u64)0 };
         }
         obj = ObjId{ ctr, *res };
@@ -197,7 +197,7 @@ std::vector<ValuePair> Automerge::get_all(const ExId& obj, Prop&& prop) const {
     ObjId object = std::get<ObjId>(exid_to_obj(obj));
     if (prop.tag == Prop::Map) {
         auto prop_cached = this->ops.m.props.lookup(std::get<std::string>(prop.data));
-        if (!prop_cached) {
+        if (!prop_cached.has_value()) {
             return {};
         }
 
@@ -252,7 +252,7 @@ void Automerge::apply_changes_with(std::vector<Change>&& changes, OpObserver* op
 
     while (true) {
         auto c = pop_next_causally_ready_change();
-        if (!c) {
+        if (!c.has_value()) {
             break;
         }
 
@@ -575,7 +575,7 @@ std::pair<ExId, ObjType> Automerge::import(const std::string_view& s) const {
 
     auto actor = ActorId(std::string(s.cbegin() + (n + 1), s.cend()));
     auto actor_index = ops.m.actors.lookup(actor);
-    if (!actor_index) {
+    if (!actor_index.has_value()) {
         throw AutomergeError{ AutomergeError::InvalidObjId, std::string(s) };
     }
 
@@ -647,7 +647,7 @@ std::optional<SyncMessage> Automerge::generate_sync_message(State& sync_state) c
         our_have.push_back(make_bloom_filter(std::vector<ChangeHash>(sync_state.shared_heads)));
     }
 
-    if (sync_state.their_have && !sync_state.their_have->empty()) {
+    if (sync_state.their_have.has_value() && !sync_state.their_have->empty()) {
         auto& last_sync = sync_state.their_have->front().last_sync;
         if (!std::all_of(last_sync.cbegin(), last_sync.cend(), [&](const ChangeHash& hash) {
             return get_change_by_hash(hash).has_value();
@@ -910,7 +910,7 @@ json map_to_json(const Automerge& doc, const ExId& obj) {
         std::optional<std::string> key;
         while ((key = keys.next())) {
             auto val = doc.get(obj, Prop(std::move(std::string(*key))));
-            if (!val) {
+            if (!val.has_value()) {
                 continue;
             }
             auto& value = val->second;
@@ -951,7 +951,7 @@ json list_to_json(const Automerge& doc, const ExId& obj) {
 
         for (usize i = 0; i < len; ++i) {
             auto val = doc.get(obj, Prop(i));
-            if (!val) {
+            if (!val.has_value()) {
                 continue;
             }
             auto& value = val->second;
@@ -1041,7 +1041,7 @@ JsonPathParsed Automerge::json_pointer_parse(ExId&& prefix_id, ObjType prefix_ty
 
     // return parsed result
     auto prop_pair = std::make_pair(std::move(parent_id), std::move(prop));
-    if (!item) {
+    if (!item.has_value()) {
         return JsonPathParsed{ JsonPathParsed::NewPath, std::move(prop_pair) };
     }
     else {
@@ -1160,7 +1160,7 @@ static void json_to_transaction(const ExId& obj, std::list<std::pair<Prop, json>
         iter = vals.erase(iter);
 
         // invalid parent_value, ignore this key-parent_value
-        if (!parsed_value) {
+        if (!parsed_value.has_value()) {
             continue;
         }
 
@@ -1204,7 +1204,7 @@ Automerge json_to_automerge(const json& value) {
 
     // parse json ROOT
     auto parsed_value = json_to_value(value, {});
-    if (!parsed_value || (parsed_value->first.tag != Value::OBJECT) ||
+    if (!parsed_value.has_value() || (parsed_value->first.tag != Value::OBJECT) ||
         (std::get<ObjType>(parsed_value->first.data) != ObjType::Map)) {
         // Automerge json ROOT should be a map
         return doc;
@@ -1232,7 +1232,7 @@ ExId Automerge::put_object(const ExId& obj, Prop&& prop, const std::string& valu
 
         // parse json value
         auto parsed_value = json_to_value(value, {});
-        if (!parsed_value || parsed_value->first.tag != Value::OBJECT) {
+        if (!parsed_value.has_value() || parsed_value->first.tag != Value::OBJECT) {
             throw std::runtime_error("invalid json object[" + value_str + "]");
         }
 
@@ -1254,7 +1254,7 @@ ExId Automerge::insert_object(const ExId& obj, usize index, const std::string& v
 
         // parse json value
         auto parsed_value = json_to_value(value, {});
-        if (!parsed_value || parsed_value->first.tag != Value::OBJECT) {
+        if (!parsed_value.has_value() || parsed_value->first.tag != Value::OBJECT) {
             throw std::runtime_error("invalid json object[" + value_str + "]");
         }
 
@@ -1277,7 +1277,7 @@ void Automerge::json_add(const json::json_pointer& path, const json& value) {
 
     // parse json value
     auto parsed_value = json_to_value(value, {});
-    if (!parsed_value) {
+    if (!parsed_value.has_value()) {
         throw std::runtime_error("invalid json value[" + value.dump() + "]");
     }
 
@@ -1362,7 +1362,7 @@ ExId Automerge::json_adding(const PropPair& item, std::pair<Value, std::list<std
 void Automerge::json_replace(const json::json_pointer& path, const json& value) {
     // parse json value
     auto parsed_value = json_to_value(value, {});
-    if (!parsed_value) {
+    if (!parsed_value.has_value()) {
         throw std::runtime_error("invalid json value[" + value.dump() + "]");
     }
 

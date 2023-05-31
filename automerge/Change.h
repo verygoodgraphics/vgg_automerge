@@ -170,7 +170,7 @@ static T read_slice(const BinSlice& bytes, Range& cursor) {
 
     std::optional<T> val;
     Decoding::decode(view, val);
-    if (!val) {
+    if (!val.has_value()) {
         throw std::runtime_error("no decoded value");
     }
 

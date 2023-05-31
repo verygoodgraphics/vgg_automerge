@@ -33,7 +33,7 @@ std::optional<SyncMessage> SyncMessage::decode(const BinSlice& bytes) {
     Decoder decoder(bytes);
 
     auto message_type = decoder.read<u8>();
-    if (!message_type) {
+    if (!message_type.has_value()) {
         return {};
     }
     if (*message_type != MESSAGE_TYPE_SYNC) {
@@ -42,17 +42,17 @@ std::optional<SyncMessage> SyncMessage::decode(const BinSlice& bytes) {
     }
 
     auto heads = decode_hashes(decoder);
-    if (!heads) {
+    if (!heads.has_value()) {
         return {};
     }
 
     auto need = decode_hashes(decoder);
-    if (!need) {
+    if (!need.has_value()) {
         return {};
     }
 
     auto have_count = decoder.read<u64>();
-    if (!have_count) {
+    if (!have_count.has_value()) {
         return {};
     }
 
@@ -60,17 +60,17 @@ std::optional<SyncMessage> SyncMessage::decode(const BinSlice& bytes) {
     have.reserve(*have_count);
     for (int i = 0; i < *have_count; ++i) {
         auto last_sync = decode_hashes(decoder);
-        if (!last_sync) {
+        if (!last_sync.has_value()) {
             return {};
         }
 
         auto bloom_bytes = decoder.read<std::vector<u8>>();
-        if (!bloom_bytes) {
+        if (!bloom_bytes.has_value()) {
             return {};
         }
 
         auto bloom = BloomFilter::parse(BinSlice(bloom_bytes->cbegin(), bloom_bytes->size()));
-        if (!bloom) {
+        if (!bloom.has_value()) {
             return {};
         }
 
@@ -81,7 +81,7 @@ std::optional<SyncMessage> SyncMessage::decode(const BinSlice& bytes) {
     }
 
     auto change_count = decoder.read<u64>();
-    if (!change_count) {
+    if (!change_count.has_value()) {
         return {};
     }
 
@@ -89,12 +89,12 @@ std::optional<SyncMessage> SyncMessage::decode(const BinSlice& bytes) {
     changes.reserve(*change_count);
     for (int i = 0; i < *change_count; ++i) {
         auto change_bytes = decoder.read<std::vector<u8>>();
-        if (!change_bytes) {
+        if (!change_bytes.has_value()) {
             return {};
         }
 
         auto change = Change::from_bytes(std::move(*change_bytes));
-        if (!change) {
+        if (!change.has_value()) {
             return {};
         }
 

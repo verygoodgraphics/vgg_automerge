@@ -22,7 +22,7 @@ struct DocWithSync {
     State peer_state;
 };
 
-Automerge increasing_put(u64 n) {
+static Automerge increasing_put(u64 n) {
     Automerge doc;
     for (u64 i = 0; i < n; ++i) {
         doc.put(ExId(), Prop(std::to_string(i)), ScalarValue{ ScalarValue::Int, (s64)i });
@@ -32,15 +32,8 @@ Automerge increasing_put(u64 n) {
     return doc;
 }
 
-void sync(DocWithSync& doc1, DocWithSync& doc2) {
-    usize MAX_ITER = 0;
-    usize iterations = 0;
-
+static void sync(DocWithSync& doc1, DocWithSync& doc2) {
     while (true) {
-        if (iterations > MAX_ITER) {
-            break;
-        }
-
         auto a_to_b = doc1.doc.generate_sync_message(doc1.peer_state);
         if (!a_to_b.has_value()) {
             break;
@@ -51,25 +44,34 @@ void sync(DocWithSync& doc1, DocWithSync& doc2) {
         if (b_to_a.has_value()) {
             doc1.doc.receive_sync_message(doc1.peer_state, std::move(*b_to_a));
         }
-
-        ++iterations;
     }
 }
 
-static void benchmark_sync(benchmark::State& state) {
-    //std::vector<u64> sizes = { 100, 1000, 10000 };
+static void sync_unidirectional(benchmark::State& state) {
+    auto _doc1 = increasing_put(state.range(0));
 
+    for (auto _ : state) {
+        DocWithSync doc1 = { _doc1, State() };
+        DocWithSync doc2;
+
+        sync(doc1, doc2);
+    }
+}
+BENCHMARK(sync_unidirectional)->Arg(100)->Arg(1000)->Arg(10000);
+
+static void sync_unidirectional_every_change(benchmark::State& state) {
     for (auto _ : state) {
         DocWithSync doc1;
         DocWithSync doc2;
 
-        for (u64 i = 0; i < 100; ++i) {
-            doc1.doc.put(ExId(), Prop(std::to_string(i)), ScalarValue{ ScalarValue::Int, (s64)i });            
+        u64 size = state.range(0);
+        for (u64 i = 0; i < size; ++i) {
+            doc1.doc.put(ExId(), Prop(std::to_string(i)), ScalarValue{ ScalarValue::Uint, i });            
             doc1.doc.commit();
             sync(doc1, doc2);
         }
     }
 }
-BENCHMARK(benchmark_sync);
+BENCHMARK(sync_unidirectional_every_change)->Arg(100)->Arg(1000)->Arg(10000);
 
 BENCHMARK_MAIN();

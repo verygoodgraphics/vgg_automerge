@@ -11,7 +11,7 @@ QueryKeys::QueryKeys(const OpTreeNode* r) :
 std::optional<Key> QueryKeys::next() {
     for (usize i = index; i < index_back; ++i) {
         auto op = root_child->get(i);
-        if (!op) {
+        if (!op.has_value()) {
             return {};
         }
 
@@ -30,7 +30,7 @@ std::optional<Key> QueryKeys::next_back() {
     for (usize i = 0; i < index_back - index; ++i) {
         usize i_back = index_back - i - 1;
         auto op = root_child->get(i_back);
-        if (!op) {
+        if (!op.has_value()) {
             return {};
         }
 

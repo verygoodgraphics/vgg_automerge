@@ -1630,13 +1630,13 @@ TEST_F(AutomergeTest, RegressionNthMiscount) {
     ));
 
     for (usize i = 0; i < 30; ++i) {
-        auto [list_id, obj_type1] = std::move(doc.get(ExId(), Prop("listval")).value());
+        auto&& [list_id, obj_type1] = std::move(doc.get(ExId(), Prop("listval")).value());
         EXPECT_EQ((Value{ Value::OBJECT, ObjType::List }), obj_type1);
 
-        auto [map_id, obj_type2] = std::move(doc.get(list_id, Prop(i)).value());
+        auto&& [map_id, obj_type2] = std::move(doc.get(list_id, Prop(i)).value());
         EXPECT_EQ((Value{ Value::OBJECT, ObjType::Map }), obj_type2);
 
-        auto obj_type3 = std::move(doc.get(map_id, Prop("test"))->second);
+        auto&& obj_type3 = std::move(doc.get(map_id, Prop("test"))->second);
         EXPECT_EQ(
             (Value{ Value::SCALAR, ScalarValue{ ScalarValue::Int, (s64)i } }),
             obj_type3
@@ -1659,10 +1659,10 @@ TEST_F(AutomergeTest, RegressionNthMiscountSmaller) {
     ));
 
     for (usize i = 0; i < B * 4; ++i) {
-        auto [list_id, obj_type1] = std::move(doc.get(ExId(), Prop("listval")).value());
+        auto&& [list_id, obj_type1] = std::move(doc.get(ExId(), Prop("listval")).value());
         EXPECT_EQ((Value{ Value::OBJECT, ObjType::List }), obj_type1);
 
-        auto obj_type2 = std::move(doc.get(list_id, Prop(i))->second);
+        auto&& obj_type2 = std::move(doc.get(list_id, Prop(i))->second);
         EXPECT_EQ(
             (Value{ Value::SCALAR, ScalarValue{ ScalarValue::Int, (s64)i } }),
             obj_type2
@@ -1691,8 +1691,8 @@ TEST_F(AutomergeTest, RegressionInsertOpid) {
     new_doc.apply_changes_with(std::vector{ std::move(*change2) }, {});
 
     for (usize i = 0; i < 30; ++i) {
-        auto [_1, doc_val] = std::move(doc.get(list_id, Prop(i)).value());
-        auto [_2, new_doc_val] = std::move(new_doc.get(list_id, Prop(i)).value());
+        auto&& [_1, doc_val] = std::move(doc.get(list_id, Prop(i)).value());
+        auto&& [_2, new_doc_val] = std::move(new_doc.get(list_id, Prop(i)).value());
 
         EXPECT_EQ(
             (Value{ Value::SCALAR, ScalarValue{ ScalarValue::Int, (s64)i } }),
@@ -1730,8 +1730,8 @@ TEST_F(AutomergeTest, BigList) {
     new_doc.apply_changes_with(std::vector{ std::move(*change2) }, {});
 
     for (usize i = 0; i < B; ++i) {
-        auto [_1, doc_val] = std::move(doc.get(list_id, Prop(i)).value());
-        auto [_2, new_doc_val] = std::move(new_doc.get(list_id, Prop(i)).value());
+        auto&& [_1, doc_val] = std::move(doc.get(list_id, Prop(i)).value());
+        auto&& [_2, new_doc_val] = std::move(new_doc.get(list_id, Prop(i)).value());
 
         EXPECT_EQ(
             (Value{ Value::OBJECT, ObjType::Map }),
@@ -2102,4 +2102,72 @@ TEST_F(SyncTest, ShouldHandleLotsOfBranchingAndMerging) {
     ASSERT_NO_THROW(sync(doc1, doc2, s1, s2));
 
     EXPECT_EQ(doc1.get_heads(), doc2.get_heads());
+}
+
+struct DocWithSync {
+    Automerge doc;
+    State peer_state;
+};
+
+Automerge repeated_increment(u64 n) {
+    Automerge doc;
+    doc.put(ExId(), Prop("counter"), ScalarValue{ ScalarValue::Counter, Counter() });
+    for (u64 i = 0; i < n; ++i) {
+        doc.increment(ExId(), Prop("counter"), 1);
+    }
+    doc.commit();
+
+    return doc;
+}
+
+Automerge repeated_put(u64 n) {
+    Automerge doc;
+    for (u64 i = 0; i < n; ++i) {
+        doc.put(ExId(), Prop("0"), ScalarValue{ ScalarValue::Uint, i });
+    }
+    doc.commit();
+
+    return doc;
+}
+
+Automerge increasing_put(u64 n) {
+    Automerge doc;
+    for (u64 i = 0; i < n; ++i) {
+        doc.put(ExId(), Prop(std::to_string(i)), ScalarValue{ ScalarValue::Uint, i });
+    }
+    doc.commit();
+
+    return doc;
+}
+
+void sync(DocWithSync& doc1, DocWithSync& doc2) {
+    while (true) {
+        auto a_to_b = doc1.doc.generate_sync_message(doc1.peer_state);
+        if (!a_to_b.has_value()) {
+            break;
+        }
+        doc2.doc.receive_sync_message(doc2.peer_state, std::move(*a_to_b));
+
+        auto b_to_a = doc2.doc.generate_sync_message(doc2.peer_state);
+        if (b_to_a.has_value()) {
+            doc1.doc.receive_sync_message(doc1.peer_state, std::move(*b_to_a));
+        }
+    }
+}
+
+TEST(BenchmarkTest, BenchmarkSync) {
+    DocWithSync doc1;
+    DocWithSync doc2;
+
+    for (u64 i = 0; i < 100; ++i) {
+        doc1.doc.put(ExId(), Prop(std::to_string(i)), ScalarValue{ ScalarValue::Int, (s64)i });
+        doc1.doc.commit();
+        sync(doc1, doc2);
+    }
+}
+
+TEST(BenchmarkTest, BenchmarkLoadPut) {
+    auto bytes = repeated_put(10000).save();
+    auto str = hex_to_string(make_bin_slice(bytes));
+    Automerge::load(make_bin_slice(bytes));
 }
