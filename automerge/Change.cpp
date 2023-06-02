@@ -14,9 +14,6 @@
 std::vector<u8> encode_document(std::vector<ChangeHash>&& heads, const std::vector<Change>& changes,
     OpSetIter&& doc_ops, const IndexedCache<ActorId>& actors_index, const std::vector<std::string>& props)
 {
-    std::vector<u8> bytes;
-    Encoder bytes_encoder(bytes);
-
     auto actors_map = actors_index.encode_index();
     auto actors = actors_index.sorted();
 
@@ -24,32 +21,45 @@ std::vector<u8> encode_document(std::vector<ChangeHash>&& heads, const std::vect
 
     auto [ops_bytes, ops_info] = DocOpEncoder::encode_doc_ops(doc_ops, actors_map, props);
 
+    std::vector<u8> actors_num_bytes;
+    Encoder actors_num_bytes_encoder(actors_num_bytes);
+    actors_num_bytes.reserve(LEB128_U64_MAX_BYTE_SIZE);
+    actors_num_bytes_encoder.encode(actors.len());
+
+    std::vector<u8> heads_num_bytes;
+    Encoder heads_num_bytes_encoder(heads_num_bytes);
+    heads_num_bytes.reserve(LEB128_U64_MAX_BYTE_SIZE);
+    heads_num_bytes_encoder.encode(heads.size());
+
+    usize chunk_size = actors_num_bytes.size() + actors.len() * (1 + ACTOR_ID_SIZE) +
+        heads_num_bytes.size() + heads.size() * HASH_SIZE +
+        change_info.size() + ops_info.size() + change_bytes.size() + ops_bytes.size();
+    usize bytes_reserve_size = HEADER_BYTES + LEB128_U64_MAX_BYTE_SIZE + chunk_size;
+
+    std::vector<u8> bytes;
+    Encoder bytes_encoder(bytes);
+    bytes.reserve(bytes_reserve_size);
+
     vector_extend(bytes, MAGIC_BYTES);
     vector_extend(bytes, { 0, 0, 0, 0 });
     bytes.push_back(BLOCK_TYPE_DOC);
+    bytes_encoder.encode(chunk_size);
 
-    std::vector<u8> chunk;
-    Encoder chunk_encoder(chunk);
-
-    chunk_encoder.encode(actors.len());
-
+    vector_extend(bytes, std::move(actors_num_bytes));
     for (auto& a : actors._cache) {
-        chunk_encoder.encode(a);
+        bytes_encoder.encode(a);
     }
 
-    chunk_encoder.encode(heads.size());
+    vector_extend(bytes, std::move(heads_num_bytes));
     for (auto& head : heads) {
-        std::move(std::begin(head.data), std::end(head.data), std::back_inserter(chunk));
+        std::move(std::begin(head.data), std::end(head.data), std::back_inserter(bytes));
     }
 
-    vector_extend(chunk, std::move(change_info));
-    vector_extend(chunk, std::move(ops_info));
+    vector_extend(bytes, std::move(change_info));
+    vector_extend(bytes, std::move(ops_info));
 
-    vector_extend(chunk, std::move(change_bytes));
-    vector_extend(chunk, std::move(ops_bytes));
-
-    bytes_encoder.encode(chunk.size());
-    vector_extend(bytes, std::move(chunk));
+    vector_extend(bytes, std::move(change_bytes));
+    vector_extend(bytes, std::move(ops_bytes));
 
     std::vector<u8> hash_result(picosha2::k_digest_size);
     picosha2::hash256(bytes.begin() + CHUNK_START, bytes.end(), hash_result.begin(), hash_result.end());
@@ -75,10 +85,9 @@ void ChangeBytes::compress(usize body_start) {
 
     std::vector<u8> result;
     result.reserve(uncompressed.size());
-
     Encoder encoder(result);
 
-    result.insert(result.end(), uncompressed.cbegin(), uncompressed.cbegin() + 8);
+    result.insert(result.end(), uncompressed.cbegin(), uncompressed.cbegin() + PREAMBLE_BYTES);
     result.push_back(BLOCK_TYPE_DEFLATE);
     encoder.encode(deflated.size());
     vector_extend(result, std::move(deflated));
@@ -196,7 +205,7 @@ Change OldChange::encode() const {
     auto chunk = encode_chunk(deps);
 
     std::vector<u8> bytes;
-    bytes.reserve(MAGIC_BYTES.size() + 4 + 1 + 10 + chunk.bytes.size());
+    bytes.reserve(HEADER_BYTES + LEB128_U64_MAX_BYTE_SIZE + chunk.bytes.size());
     Encoder encoder(bytes);
 
     vector_extend(bytes, MAGIC_BYTES);
@@ -258,7 +267,7 @@ OldChange Change::decode() const {
 }
 
 OperationIterator Change::iter_ops() const {
-    return OperationIterator({ bytes.uncompressed.cbegin(), bytes.uncompressed.size() }, actors, ops);
+    return OperationIterator(make_bin_slice(bytes.uncompressed), actors, ops);
 }
 
 /////////////////////////////////////////////////////////
@@ -446,7 +455,7 @@ std::pair<u8, Range> decode_header_without_hash(const BinSlice& bytes) {
     if (bytes.second <= HEADER_BYTES) {
         throw std::runtime_error("not enough bytes");
     }
-    if (!bin_slice_cmp({ bytes.first, 4 }, { MAGIC_BYTES.cbegin(), MAGIC_BYTES.size() })) {
+    if (!bin_slice_cmp({ bytes.first, MAGIC_BYTES.size()}, make_bin_slice(MAGIC_BYTES))) {
         throw std::runtime_error("wrong magic bytes");
     }
 
@@ -492,7 +501,7 @@ std::vector<BinSlice> split_blocks(const BinSlice& bytes) {
 }
 
 std::optional<Range> pop_block(const BinSlice& bytes) {
-    if (bytes.second < 4 || !bin_slice_cmp({ bytes.first, 4 }, { MAGIC_BYTES.cbegin(), MAGIC_BYTES.size() })) {
+    if (bytes.second < 4 || !bin_slice_cmp({ bytes.first, 4 }, make_bin_slice(MAGIC_BYTES))) {
         return {};
     }
 

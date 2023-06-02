@@ -107,6 +107,7 @@ std::vector<usize> IndexedCache<T>::encode_index() const {
     std::sort(sorted_vec.begin(), sorted_vec.end());
 
     std::vector<usize> res;
+    res.reserve(sorted_vec.size());
     for (auto& t : this->_cache) {
         res.push_back(std::lower_bound(sorted_vec.begin(), sorted_vec.end(), t) - sorted_vec.begin());
     }

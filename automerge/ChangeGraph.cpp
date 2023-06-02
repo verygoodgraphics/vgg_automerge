@@ -105,8 +105,7 @@ void ChangeGraph::traverse_ancestors(
 
     std::set<u32> visited;
     while (!to_visit.empty()) {
-        auto idx = to_visit.back();
-        to_visit.pop_back();
+        auto idx = vector_pop(to_visit);
 
         if (visited.count(idx)) {
             continue;

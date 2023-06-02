@@ -7,8 +7,9 @@
 
 #include "type.h"
 
-const usize DEFLATE_MIN_SIZE = 256;
-const u32 COLUMN_TYPE_DEFLATE = 8;
+constexpr usize DEFLATE_MIN_SIZE = 256;
+constexpr u32 COLUMN_TYPE_DEFLATE = 8;
+constexpr usize LEB128_U64_MAX_BYTE_SIZE = 10;
 
 class Encoder {
 public:

@@ -285,8 +285,12 @@ std::optional<Change> Automerge::pop_next_causally_ready_change() {
     while (index < queue.size()) {
         if (is_causally_ready(queue[index])) {
             auto res = Change(std::move(queue[index]));
-            queue[index] = std::move(queue.back());
-            queue.pop_back();
+            if (index == queue.size() - 1) {
+                queue.pop_back();
+            }
+            else {
+                queue[index] = vector_pop(queue);
+            }
             return { std::move(res) };
         }
         ++index;
@@ -377,6 +381,7 @@ std::vector<u8> Automerge::save() {
 
 void Automerge::filter_changes(const std::vector<ChangeHash>& _heads, std::set<ChangeHash>& changes) const {
     std::vector<ChangeHash> heads;
+    heads.reserve(_heads.size());
     for (auto& hash : _heads) {
         if (histroy_index.count(hash)) {
             heads.push_back(hash);
@@ -831,8 +836,7 @@ std::vector<const Change*> Automerge::get_changes_to_send(const std::vector<Have
 
     std::vector<ChangeHash> stack(hashes_to_send.cbegin(), hashes_to_send.cend());
     while (!stack.empty()) {
-        ChangeHash hash = std::move(stack.back());
-        stack.pop_back();
+        auto hash = vector_pop(stack);
 
         auto deps = dependents.find(hash);
         if (deps != dependents.end()) {

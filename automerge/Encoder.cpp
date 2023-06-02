@@ -8,6 +8,8 @@
 #include "helper.h"
 
 usize Encoder::encode(const std::string& val) {
+    out_buf.reserve(out_buf.size() + LEB128_U64_MAX_BYTE_SIZE + val.size());
+
     usize head = encode(val.size());
     out_buf.insert(out_buf.end(), val.begin(), val.end());
 
@@ -17,16 +19,20 @@ usize Encoder::encode(const std::string& val) {
 usize Encoder::encode(const std::vector<ActorId>& val, usize skip) {
     assert(skip <= val.size());
 
+    out_buf.reserve(out_buf.size() + LEB128_U64_MAX_BYTE_SIZE + (val.size() - skip) * ACTOR_ID_SIZE);
+
     usize len = encode(val.size() - skip);
     for (auto iter = val.cbegin() + skip; iter != val.cend(); ++iter) {
-        //len += encode(std::vector<u8>(std::begin(actor.data), std::end(actor.data)));
         len += encode(*iter);
     }
+
     return len;
 }
 
 usize Encoder::encode(const ActorId& val) {
-    usize len = 16;
+    out_buf.reserve(out_buf.size() + 1 + ACTOR_ID_SIZE);
+
+    usize len = ACTOR_ID_SIZE;
     usize head = encode(len);
     out_buf.insert(out_buf.end(), std::begin(val.data), std::end(val.data));
 
@@ -34,6 +40,8 @@ usize Encoder::encode(const ActorId& val) {
 }
 
 usize Encoder::encode(const std::vector<u8>& val) {
+    out_buf.reserve(out_buf.size() + LEB128_U64_MAX_BYTE_SIZE + val.size());
+
     usize head = encode(val.size());
     vector_extend(out_buf, val);
 
@@ -41,6 +49,8 @@ usize Encoder::encode(const std::vector<u8>& val) {
 }
 
 usize Encoder::encode(const BinSlice& val) {
+    out_buf.reserve(out_buf.size() + LEB128_U64_MAX_BYTE_SIZE + val.second);
+
     usize head = encode(val.second);
     out_buf.insert(out_buf.end(), val.first, val.first + val.second);
 
@@ -48,6 +58,8 @@ usize Encoder::encode(const BinSlice& val) {
 }
 
 usize Encoder::encode(const std::vector<ChangeHash>& val) {
+    out_buf.reserve(out_buf.size() + LEB128_U64_MAX_BYTE_SIZE + val.size() * HASH_SIZE);
+
     usize head = encode(val.size());
     usize body = 0;
 

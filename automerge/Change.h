@@ -17,14 +17,14 @@
 #include "legacy.h"
 
 const std::vector<u8> MAGIC_BYTES = { 0x85, 0x6f, 0x4a, 0x83 };
-const usize PREAMBLE_BYTES = 8;
-const usize HEADER_BYTES = PREAMBLE_BYTES + 1;
+constexpr usize PREAMBLE_BYTES = 8;
+constexpr usize HEADER_BYTES = PREAMBLE_BYTES + 1;
 
-const u8 BLOCK_TYPE_DOC = 0;
-const u8 BLOCK_TYPE_CHANGE = 1;
-const u8 BLOCK_TYPE_DEFLATE = 2;
-const usize CHUNK_START = 8;
-const Range HASH_RANGE = { 4, 8 };
+constexpr u8 BLOCK_TYPE_DOC = 0;
+constexpr u8 BLOCK_TYPE_CHANGE = 1;
+constexpr u8 BLOCK_TYPE_DEFLATE = 2;
+constexpr usize CHUNK_START = 8;
+constexpr Range HASH_RANGE = { 4, 8 };
 
 std::vector<u8> encode_document(std::vector<ChangeHash>&& heads, const std::vector<Change>& changes,
     OpSetIter&& doc_ops, const IndexedCache<ActorId>& actors_index, const std::vector<std::string>& props);
