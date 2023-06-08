@@ -216,7 +216,7 @@ std::optional<std::vector<OldOpId>> PredIterator::next() {
             return {};
         }
 
-        p.push_back(OldOpId(**ctr, (*actors)[**actor]));
+        p.emplace_back(**ctr, (*actors)[**actor]);
     }
 
     std::sort(p.begin(), p.end());
@@ -1025,9 +1025,9 @@ std::pair<std::vector<u8>, std::vector<u8>> DocOpEncoder::finish() {
     return { std::move(data), std::move(info) };
 }
 
-void ColumnEncoder::append(const OldOp& op, const std::vector<ActorId>& actors) {
+void ColumnEncoder::append(OldOp&& op, const std::vector<ActorId>& actors) {
     obj.append(op.obj, actors);
-    key.append(OldKey(op.key), actors);
+    key.append(std::move(op.key), actors);
     insert.append(op.insert);
 
     pred.append(op.pred, actors);

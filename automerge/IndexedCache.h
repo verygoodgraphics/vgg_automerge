@@ -70,8 +70,8 @@ usize IndexedCache<T>::cache(T&& item) {
     }
 
     usize n = _cache.size();
-    _cache.push_back(item);
-    _lookup.insert({ std::move(item), n });
+    _lookup.emplace(item, n);
+    _cache.push_back(std::move(item));
 
     return n;
 }

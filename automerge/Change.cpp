@@ -148,7 +148,7 @@ void increment_range_map(std::unordered_map<u32, Range>& ranges, usize len) {
     }
 }
 
-ChunkIntermediate OldChange::encode_chunk(const std::vector<ChangeHash>& deps) const {
+ChunkIntermediate OldChange::encode_chunk(const std::vector<ChangeHash>& deps) {
     std::vector<u8> bytes;
     Encoder encoder(bytes);
     bytes.reserve(256); // guessed minimum length of encoded Change bytes
@@ -172,7 +172,7 @@ ChunkIntermediate OldChange::encode_chunk(const std::vector<ChangeHash>& deps) c
     Range message_range{ message_start, bytes.size() };
 
     // encode ops into a side buffer - collect all other actors
-    auto [ops_buf, ops] = ColumnEncoder::encode_ops(operations, actors);
+    auto [ops_buf, ops] = ColumnEncoder::encode_ops(std::move(operations), actors);
 
     // encode all other actors
     encoder.encode(actors, 1);
@@ -198,11 +198,14 @@ ChunkIntermediate OldChange::encode_chunk(const std::vector<ChangeHash>& deps) c
     };
 }
 
-Change OldChange::encode() const {
-    std::vector<ChangeHash> deps(this->deps);
+/////////////////////////////////////////////////////////
+
+Change Change::from_old_change(OldChange&& change) {
+    auto& deps = change.deps;
     std::sort(deps.begin(), deps.end());
 
-    auto chunk = encode_chunk(deps);
+    auto num_ops = change.operations.size();
+    auto chunk = change.encode_chunk(deps);
 
     std::vector<u8> bytes;
     bytes.reserve(HEADER_BYTES + LEB128_U64_MAX_BYTE_SIZE + chunk.bytes.size());
@@ -239,19 +242,17 @@ Change OldChange::encode() const {
         ChangeBytes{ false, {}, std::move(bytes) },
         body_start,
         std::move(hash),
-        seq,
-        start_op,
-        time,
+        change.seq,
+        change.start_op,
+        change.time,
         std::move(chunk.message),
         std::move(chunk.actors),
         std::move(deps),
         std::move(chunk.ops),
         std::move(chunk.extra_bytes),
-        operations.size()
+        num_ops
     };
 }
-
-/////////////////////////////////////////////////////////
 
 std::optional<std::string> Change::get_message() const {
     if (message.first == message.second) {
@@ -376,7 +377,7 @@ std::vector<ChangeHash> decode_hashes(const BinSlice& bytes, Range& cursor) {
         if (bytes.second < hash.second) {
             throw std::runtime_error("no enough bytes");
         }
-        hashes.push_back(ChangeHash(BinSlice{ bytes.first + hash.first, hash.second - hash.first }));
+        hashes.emplace_back(BinSlice{ bytes.first + hash.first, hash.second - hash.first });
     }
 
     return hashes;
@@ -388,7 +389,7 @@ std::vector<ActorId> decode_actors(const BinSlice& bytes, Range& cursor, std::op
     actors.reserve(num_actors + 1);
 
     if (first) {
-        actors.push_back(*first);
+        actors.push_back(std::move(*first));
     }
 
     for (usize i = 0; i < num_actors; ++i) {
@@ -396,7 +397,7 @@ std::vector<ActorId> decode_actors(const BinSlice& bytes, Range& cursor, std::op
         if (bytes.second < range.second) {
             throw std::runtime_error("no enough bytes");
         }
-        actors.push_back(ActorId(BinSlice{ bytes.first + range.first, range.second - range.first }));
+        actors.emplace_back(BinSlice{ bytes.first + range.first, range.second - range.first });
     }
 
     return actors;
@@ -419,7 +420,7 @@ std::vector<std::pair<u32, usize>> decode_column_info(const BinSlice& bytes, Ran
         }
 
         last_id = id;
-        columns.push_back({ id, read_slice<usize>(bytes, cursor) });
+        columns.emplace_back(id, read_slice<usize>(bytes, cursor));
     }
 
     return columns;
@@ -487,7 +488,7 @@ std::vector<BinSlice> split_blocks(const BinSlice& bytes) {
             break;
         }
 
-        blocks.push_back({ cursor.first + block->first, block->second - block->first });
+        blocks.emplace_back(cursor.first + block->first, block->second - block->first);
 
         if (cursor.second <= block->second) {
             break;
@@ -675,7 +676,7 @@ std::optional<std::vector<Change>> compress_doc_changes(std::vector<DocChange>&&
             uncompressed_change.deps.push_back(changes[idx].hash);
         }
 
-        changes.push_back(uncompressed_change.encode());
+        changes.push_back(Change::from_old_change(std::move(uncompressed_change)));
     }
 
     return changes;
@@ -688,16 +689,16 @@ OldChange doc_change_to_uncompressed_change(DocChange&& change, const std::vecto
         std::vector<OldOpId> pred;
         pred.reserve(op.pred.size());
         for (auto& [ctr, actor] : op.pred) {
-            pred.push_back(OldOpId{ ctr, actors[actor] });
+            pred.emplace_back(ctr, actors[actor]);
         }
 
-        oprations.push_back(OldOp(
+        oprations.emplace_back(
             std::move(op.action),
             std::move(op.obj),
             std::move(op.key),
             std::move(pred),
             op.insert
-        ));
+        );
     }
 
     return {

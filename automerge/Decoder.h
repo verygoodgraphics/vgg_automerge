@@ -142,8 +142,8 @@ private:
 
 struct BooleanDecoder {
     Decoder decoder;
-    bool last_value;
-    usize count;
+    bool last_value = false;
+    usize count = 0;
 
     BooleanDecoder() = default;
     BooleanDecoder(std::vector<u8>&& data) : decoder(std::move(data)), last_value(true), count(0) {}
@@ -205,7 +205,7 @@ struct RleDecoder {
 
 struct DeltaDecoder {
     RleDecoder<s64> rle;
-    u64 absolute_val;
+    u64 absolute_val = 0;
 
     DeltaDecoder() = default;
     DeltaDecoder(std::vector<u8>&& bytes) : rle(std::move(bytes)), absolute_val(0) {}

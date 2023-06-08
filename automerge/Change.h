@@ -82,9 +82,8 @@ struct OldChange {
     // an operation) lexicographically ordered following the change author.
     std::vector<ActorId> actor_ids_in_change() const;
 
-    ChunkIntermediate encode_chunk(const std::vector<ChangeHash>& deps) const;
-
-    Change encode() const;
+    // note: consume operations
+    ChunkIntermediate encode_chunk(const std::vector<ChangeHash>& deps);
 };
 
 struct ChunkIntermediate {
@@ -131,6 +130,8 @@ struct Change {
         // TODO: handle exception
         return decode_change(std::move(bytes));
     }
+
+    static Change from_old_change(OldChange&& change);
 
     bool is_empty() const {
         return len() == 0;

@@ -405,7 +405,7 @@ Op OpTreeNode::remove_from_internal_child(usize index, usize child_index) {
 
             ++children[child_index].length;
             children[child_index].index.insert(parent_element);
-            children[child_index].elements.push_back(parent_element);
+            children[child_index].elements.push_back(std::move(parent_element));
 
             if (!children[child_index + 1].is_leaf()) {
                 OpTreeNode first_child = vector_remove(children[child_index + 1].children, 0);
@@ -413,7 +413,7 @@ Op OpTreeNode::remove_from_internal_child(usize index, usize child_index) {
                 children[child_index + 1].reindex();
                 children[child_index].length += first_child.len();
 
-                children[child_index].children.push_back(first_child);
+                children[child_index].children.push_back(std::move(first_child));
                 children[child_index].reindex();
             }
         }

@@ -348,22 +348,22 @@ struct ColumnEncoder {
     ValEncoder val = {};
     PredEncoder pred = {};
 
-    static auto encode_ops(const std::vector<OldOp>& ops, const std::vector<ActorId>& actors)
+    static auto encode_ops(std::vector<OldOp>&& ops, const std::vector<ActorId>& actors)
         -> std::pair<std::vector<u8>, std::unordered_map<u32, Range>>
     {
         ColumnEncoder e;
 
-        e.encode(ops, actors);
+        e.encode(std::move(ops), actors);
         return e.finish();
     }
 
-    void encode(const std::vector<OldOp>& ops, const std::vector<ActorId>& actors) {
+    void encode(std::vector<OldOp>&& ops, const std::vector<ActorId>& actors) {
         for (auto& op : ops) {
-            append(op, actors);
+            append(std::move(op), actors);
         }
     }
 
-    void append(const OldOp& op, const std::vector<ActorId>& actors);
+    void append(OldOp&& op, const std::vector<ActorId>& actors);
 
     auto finish() -> std::pair<std::vector<u8>, std::unordered_map<u32, Range>>;
 };

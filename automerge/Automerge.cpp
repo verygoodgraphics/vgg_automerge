@@ -51,7 +51,7 @@ TransactionInner Automerge::transaction_inner() {
             }
         }
         if (!found) {
-            deps.push_back(last_hash);
+            deps.push_back(std::move(last_hash));
         }
     }
 
@@ -334,7 +334,7 @@ std::vector<std::pair<ObjId, Op>> Automerge::imports_ops(const Change& change) {
             }
         }
 
-        res.push_back({
+        res.emplace_back(
             std::move(obj),
             Op{
                 std::move(id),
@@ -343,7 +343,6 @@ std::vector<std::pair<ObjId, Op>> Automerge::imports_ops(const Change& change) {
                 {},
                 std::move(pred),
                 c->insert
-            }
             });
 
         ++i;
@@ -415,9 +414,10 @@ std::vector<ChangeHash> Automerge::get_missing_deps(const std::vector<ChangeHash
     }
 
     std::vector<ChangeHash> missing_deps;
-    for (auto& hash : missing) {
-        if (!in_queue.count(hash)) {
-            missing_deps.push_back(hash);
+    missing_deps.reserve(missing.size());
+    for (auto iter = missing.begin(); iter != missing.end(); ++iter) {
+        if (!in_queue.count(*iter)) {
+            missing_deps.push_back(std::move(missing.extract(iter).value()));
         }
     }
     std::sort(missing_deps.begin(), missing_deps.end());
@@ -649,7 +649,7 @@ std::optional<SyncMessage> Automerge::generate_sync_message(State& sync_state) c
     if (std::all_of(our_need.cbegin(), our_need.cend(), [&](const ChangeHash& hash) {
         return their_heads_set.count(hash);
         })) {
-        our_have.push_back(make_bloom_filter(std::vector<ChangeHash>(sync_state.shared_heads)));
+        our_have.push_back(make_bloom_filter(std::vector(sync_state.shared_heads)));
     }
 
     if (sync_state.their_have.has_value() && !sync_state.their_have->empty()) {
@@ -738,6 +738,7 @@ void Automerge::receive_sync_message_with(State& sync_state, SyncMessage&& messa
     }
 
     std::vector<const ChangeHash*> known_heads;
+    known_heads.reserve(message_heads.size());
     for (auto& head : message_heads) {
         if (get_change_by_hash(head).has_value()) {
             known_heads.push_back(&head);
@@ -811,7 +812,12 @@ std::vector<const Change*> Automerge::get_changes_to_send(const std::vector<Have
         last_sync_hashes_set.insert(last_sync.cbegin(), last_sync.cend());
         bloom_filters.push_back(&bloom);
     }
-    std::vector<ChangeHash> last_sync_hashes(last_sync_hashes_set.cbegin(), last_sync_hashes_set.cend());
+
+    std::vector<ChangeHash> last_sync_hashes;
+    last_sync_hashes.reserve(last_sync_hashes_set.size());
+    for (auto iter = last_sync_hashes_set.begin(); iter != last_sync_hashes_set.end(); ) {
+        last_sync_hashes.push_back(std::move(last_sync_hashes_set.extract(iter++).value()));
+    }
 
     auto changes = get_changes(last_sync_hashes);
 
@@ -842,7 +848,7 @@ std::vector<const Change*> Automerge::get_changes_to_send(const std::vector<Have
         if (deps != dependents.end()) {
             for (auto& dep : deps->second) {
                 if (hashes_to_send.insert(dep).second) {
-                    stack.push_back(dep);
+                    stack.push_back(std::move(dep));
                 }
             }
         }
@@ -1109,7 +1115,7 @@ static auto json_to_object(const json& value, const std::optional<std::string>& 
         std::list<std::pair<Prop, json>> map;
 
         for (auto& [key, val] : obj) {
-            map.push_back({ Prop(std::string(key)), std::move(val) });
+            map.emplace_back(Prop(std::string(key)), std::move(val));
         }
 
         return std::make_pair(ObjType::Map, std::move(map));
@@ -1121,7 +1127,7 @@ static auto json_to_object(const json& value, const std::optional<std::string>& 
 
         for (usize i = 0; i < vec.size(); ++i) {
             // treat an Automerge list as a singly linked list, insert items from front in reverse order use O(N) time
-            list.push_back({ Prop(0), std::move(vec[vec.size() - i - 1]) });
+            list.emplace_back(Prop(0), std::move(vec[vec.size() - i - 1]));
         }
 
         return std::make_pair(ObjType::List, std::move(list));

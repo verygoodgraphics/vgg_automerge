@@ -33,10 +33,10 @@ ChangeHash TransactionInner::commit(Automerge& doc, std::optional<std::string>&&
 Change TransactionInner::export_change(const IndexedCache<ActorId>& actors, const IndexedCache<std::string>& props) {
     std::vector<OldOp> old_operations;
     for (auto& [obj, prop, op] : operations) {
-        old_operations.push_back(OldOp(op, obj, actors, props));
+        old_operations.emplace_back(op, obj, actors, props);
     }
 
-    return OldChange{
+    return Change::from_old_change(OldChange{
         std::move(old_operations),
         actors.get(actor),
         std::move(hash),
@@ -46,7 +46,7 @@ Change TransactionInner::export_change(const IndexedCache<ActorId>& actors, cons
         std::move(message),
         std::move(deps),
         std::move(extra_bytes)
-    }.encode();
+    });
 }
 
 void TransactionInner::put(Automerge& doc, const ExId& ex_obj, Prop&& prop, ScalarValue&& value) {
@@ -111,7 +111,7 @@ void TransactionInner::insert_local_op(Automerge& doc, Prop&& prop, Op&& op, usi
         doc.ops.insert(pos, obj, Op(op));
     }
 
-    operations.push_back({ obj, std::move(prop), std::move(op) });
+    operations.emplace_back(obj, std::move(prop), std::move(op));
 }
 
 void TransactionInner::insert(Automerge& doc, const ExId& ex_obj, usize index, ScalarValue&& value) {
@@ -153,7 +153,7 @@ OpId TransactionInner::do_insert(Automerge& doc, ObjId& obj, usize index, OpType
     };
 
     doc.ops.insert(query.pos(), obj, Op(op));
-    operations.push_back({ obj, Prop(index), std::move(op) });
+    operations.emplace_back(obj, Prop(index), std::move(op));
 
     return id;
 }

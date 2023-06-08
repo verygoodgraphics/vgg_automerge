@@ -266,21 +266,59 @@ void hex_string_test() {
     assert(binary == bin_vec);
 }
 
+static Automerge decreasing_put(u64 n) {
+    Automerge doc;
+    for (u64 i = n; i > 0; --i) {
+        doc.put(ExId(), Prop(std::to_string(i)), ScalarValue{ ScalarValue::Uint, i });
+    }
+    doc.commit();
+
+    return doc;
+}
+
+static void map_decreasing_put() {
+    for (int i = 0; i < 10; ++i) {
+        decreasing_put(10000);
+    }
+}
+
+static void map_save_decreasing_put() {
+    auto doc = decreasing_put(100);
+
+    for (int i = 0; i < 100000; ++i) {
+        doc.save();
+    }
+}
+
+void vector_string() {
+    std::vector<std::string> vs;
+
+    for (int i = 0; i < 10000; ++i) {
+        vs.push_back(std::to_string(i));
+    }
+}
+
 int main()
 {
-    std::cout << "demo\n";
+    //std::cout << "demo\n";
 
-    auto doc = quickstart();
+    //auto doc = quickstart();
 
-    direct_edit_test();
+    //direct_edit_test();
 
-    json_demo();
+    //json_demo();
 
-    json_test(doc);
+    //json_test(doc);
 
-    hex_string_test();
+    //hex_string_test();
 
-    std::cout << "passed" << std::endl;
+    //std::cout << "passed" << std::endl;
+
+    map_decreasing_put();
+
+    //map_save_decreasing_put();
+
+    //vector_string();
 
     return 0;
 }

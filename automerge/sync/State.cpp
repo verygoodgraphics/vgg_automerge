@@ -62,7 +62,7 @@ std::optional<std::vector<ChangeHash>> decode_hashes(Decoder& decoder) {
                 return {};
             }
             
-            hashes.push_back(ChangeHash(*hash_bytes));
+            hashes.emplace_back(*hash_bytes);
         }
     }
     catch (std::exception) {

@@ -38,6 +38,14 @@
             }
         },
         {
+            "name": "x64-release-debuginfo",
+            "displayName": "x64 Release-debuginfo",
+            "inherits": "x64-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+            }
+        },
+        {
             "name": "x86-debug",
             "displayName": "x86 Debug",
             "inherits": "windows-base",

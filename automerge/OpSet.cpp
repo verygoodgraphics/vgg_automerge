@@ -78,7 +78,7 @@ OpSetIter OpSetInternal::iter() const {
     std::vector<std::pair<const ObjId*, const OpTree*>> objs;
     objs.reserve(trees.size());
     for (auto& tree : trees) {
-        objs.push_back({ &tree.first, &tree.second });
+        objs.emplace_back(&tree.first, &tree.second);
     }
 
     // TODO: why need stable sort?
