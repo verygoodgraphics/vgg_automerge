@@ -30,11 +30,29 @@
             }
         },
         {
+            "name": "x64-clang-debug",
+            "displayName": "x64 clang Debug",
+            "inherits": "x64-debug",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang-cl.exe",
+                "CMAKE_CXX_COMPILER": "clang-cl.exe"
+            }
+        },
+        {
             "name": "x64-release",
             "displayName": "x64 Release",
             "inherits": "x64-debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
+            }
+        },        
+        {
+            "name": "x64-clang-release",
+            "displayName": "x64 clang Release",
+            "inherits": "x64-release",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang-cl.exe",
+                "CMAKE_CXX_COMPILER": "clang-cl.exe"
             }
         },
         {
@@ -43,6 +61,15 @@
             "inherits": "x64-debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+            }
+        },
+        {
+            "name": "x64-clang-release-debuginfo",
+            "displayName": "x64 clang Release-debuginfo",
+            "inherits": "x64-release-debuginfo",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang-cl.exe",
+                "CMAKE_CXX_COMPILER": "clang-cl.exe"
             }
         },
         {
