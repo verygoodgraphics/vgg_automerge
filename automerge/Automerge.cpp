@@ -415,9 +415,13 @@ std::vector<ChangeHash> Automerge::get_missing_deps(const std::vector<ChangeHash
 
     std::vector<ChangeHash> missing_deps;
     missing_deps.reserve(missing.size());
-    for (auto iter = missing.begin(); iter != missing.end(); ++iter) {
+    for (auto iter = missing.begin(); iter != missing.end();) {
         if (!in_queue.count(*iter)) {
-            missing_deps.push_back(std::move(missing.extract(iter).value()));
+            // need iter++ as iter will be invalid after extract()
+            missing_deps.push_back(std::move(missing.extract(iter++).value()));
+        }
+        else {
+            ++iter;
         }
     }
     std::sort(missing_deps.begin(), missing_deps.end());
