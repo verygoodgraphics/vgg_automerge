@@ -172,9 +172,9 @@
             "configurePreset": "linux-clang-debug"
         },
         {
-          "name": "windows-tesst",
-          "inherits": "linux-clang-test",
-          "configurePreset": "x64-debug"
+            "name": "windows-test",
+            "inherits": "linux-clang-test",
+            "configurePreset": "x64-debug"
         }
     ]
 }

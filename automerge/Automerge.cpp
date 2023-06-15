@@ -717,7 +717,7 @@ std::optional<SyncMessage> Automerge::generate_sync_message(State& sync_state) c
 void Automerge::receive_sync_message_with(State& sync_state, SyncMessage&& message, OpObserver* options) {
     auto before_heads = get_heads();
 
-    auto&& [message_heads, message_need, message_have, message_changes] = std::move(message);
+    auto& [message_heads, message_need, message_have, message_changes] = message;
 
     bool change_is_empty = message_changes.empty();
     if (!change_is_empty) {
@@ -1469,7 +1469,7 @@ std::pair<ExId, ObjType> Automerge::import_path(
     ExId&& prefix_id, ObjType prefix_type, const std::string_view& obj_path
 ) const {
     try {
-        auto&& json_path = (obj_path == "/") ? json::json_pointer() : json::json_pointer(std::string(obj_path));
+        json::json_pointer json_path = (obj_path == "/") ? json::json_pointer() : json::json_pointer(std::string(obj_path));
         auto item = json_pointer_parse(std::move(prefix_id), prefix_type, json_path);
         if (item.tag != JsonPathParsed::ExistedPath) {
             throw;

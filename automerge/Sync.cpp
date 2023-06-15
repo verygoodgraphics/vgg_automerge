@@ -123,7 +123,7 @@ std::vector<ChangeHash> advance_heads(
         }
     }
 
-    for (auto&& head : our_old_shared_heads) {
+    for (auto& head : our_old_shared_heads) {
         if (my_new_heads.count(head)) {
             advanced_heads.push_back(std::move(head));
         }

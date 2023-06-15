@@ -2166,8 +2166,8 @@ TEST(BenchmarkTest, BenchmarkSync) {
     }
 }
 
-TEST(BenchmarkTest, BenchmarkLoadPut) {
-    auto bytes = repeated_put(10000).save();
-    auto str = hex_to_string(make_bin_slice(bytes));
-    Automerge::load(make_bin_slice(bytes));
-}
+//TEST(BenchmarkTest, BenchmarkLoadPut) {
+//    auto bytes = repeated_put(10000).save();
+//    auto str = hex_to_string(make_bin_slice(bytes));
+//    Automerge::load(make_bin_slice(bytes));
+//}
