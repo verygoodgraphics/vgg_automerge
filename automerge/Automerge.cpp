@@ -322,7 +322,7 @@ std::vector<std::pair<ObjId, Op>> Automerge::imports_ops(const Change& change) {
 
         Key key;
         if (c->key.tag == OldKey::MAP) {
-            key = Key{ Key::Map, ops.m.props.cache(std::get<std::string>(std::move(c->key.data))) };
+            key = Key{ Key::Map, ops.m.props.cache(std::get<std::string_view>(std::move(c->key.data))) };
         }
         else {
             auto& elem_id = std::get<OldElementId>(c->key.data);
@@ -582,7 +582,7 @@ std::pair<ExId, ObjType> Automerge::import(const std::string_view& s) const {
         throw AutomergeError{ AutomergeError::InvalidObjIdFormat, std::string(s) };
     }
 
-    auto actor = ActorId(std::string(s.cbegin() + (n + 1), s.cend()));
+    auto actor = ActorId(std::string_view(s.data() + (n + 1), s.size() - (n + 1)));
     auto actor_index = ops.m.actors.lookup(actor);
     if (!actor_index.has_value()) {
         throw AutomergeError{ AutomergeError::InvalidObjId, std::string(s) };
@@ -626,7 +626,7 @@ std::string Automerge::to_string(Export&& id) const {
         return str;
     }
     case Export::Prop:
-        return ops.m.props[std::get<usize>(id.data)];
+        return std::string(ops.m.props[std::get<usize>(id.data)]);
     case Export::Special:
         return std::get<std::string>(id.data);
     default:

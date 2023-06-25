@@ -23,7 +23,7 @@ ChangeHash::ChangeHash(const BinSlice& bin) {
     std::copy(bin.first, bin.first + bin.second, data);
 }
 
-ChangeHash::ChangeHash(const std::string& hex_str) {
+ChangeHash::ChangeHash(const std::string_view& hex_str) {
     if (hex_str.length() != HASH_SIZE * 2) {
         throw std::runtime_error("invalid change hash string");
     }
@@ -92,7 +92,7 @@ ActorId::ActorId(const BinSlice& slice) {
     }
 }
 
-ActorId::ActorId(const std::string& hex_str) {
+ActorId::ActorId(const std::string_view& hex_str) {
     if (hex_str.length() % 2) {
         throw std::runtime_error("invalid actor id string");
     }

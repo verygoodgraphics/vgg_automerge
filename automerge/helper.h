@@ -7,6 +7,7 @@
 #include <iterator>
 #include <algorithm> 
 #include <cassert>
+#include <string_view>
 
 #include "type.h"
 
@@ -101,4 +102,39 @@ std::string hex_to_string(const std::pair<T, usize>& hex_bytes) {
     return str;
 }
 
-std::vector<u8> hex_from_string(const std::string& hex_str);
+std::vector<u8> hex_from_string(const std::string_view& hex_str);
+
+/////////////////////////////////////////////////////////
+
+constexpr usize BUFFER_BLOCK_SIZE = 64 * 1024;
+class buffer_blcok {
+public:
+    buffer_blcok(usize len);
+
+    buffer_blcok(buffer_blcok&& b) noexcept :
+        data(b.data), size(b.size), begin(b.begin), end(b.end) {
+        b.data = nullptr;
+    }
+
+    buffer_blcok(const buffer_blcok&) = delete;
+    buffer_blcok& operator=(const buffer_blcok&) = delete;
+    buffer_blcok& operator=(buffer_blcok&&) = delete;
+
+    ~buffer_blcok() {
+        delete[] data;
+    }
+
+    usize rest_size() const {
+        return end - begin;
+    }
+
+    std::string_view cache_string(const std::string& str);
+
+private:
+    char* data = nullptr;
+    usize size = 0;
+    usize begin = 0;
+    usize end = 0;
+};
+
+std::string_view cache_string(const std::string& str);

@@ -7,6 +7,15 @@
 #include "leb128.h"
 #include "helper.h"
 
+usize Encoder::encode(const std::string_view& val) {
+    out_buf.reserve(out_buf.size() + LEB128_U64_MAX_BYTE_SIZE + val.size());
+
+    usize head = encode(val.size());
+    out_buf.insert(out_buf.end(), val.begin(), val.end());
+
+    return head + val.size();
+}
+
 usize Encoder::encode(const std::string& val) {
     out_buf.reserve(out_buf.size() + LEB128_U64_MAX_BYTE_SIZE + val.size());
 

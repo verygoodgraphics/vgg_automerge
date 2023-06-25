@@ -277,7 +277,7 @@ static Automerge decreasing_put(u64 n) {
 }
 
 static void map_decreasing_put() {
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 1000; ++i) {
         decreasing_put(10000);
     }
 }

@@ -38,7 +38,7 @@ struct TransactionInner {
 
     ChangeHash commit(Automerge& doc, std::optional<std::string>&& message, std::optional<s64>&& time, std::optional<OpObserver*>&& op_observer);
 
-    Change export_change(const IndexedCache<ActorId>& actors, const IndexedCache<std::string>& props);
+    Change export_change(const IndexedCache<ActorId>& actors, const IndexedCache<std::string_view>& props);
 
     // throw AutomergeError
     void put(Automerge& doc, const ExId& ex_obj, Prop&& prop, ScalarValue&& value);

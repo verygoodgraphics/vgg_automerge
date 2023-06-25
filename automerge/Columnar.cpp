@@ -277,7 +277,7 @@ OperationIterator::OperationIterator(const BinSlice& bytes, const std::vector<Ac
         &actors,
         col_iter<RleDecoder<usize>>(bytes, ops, COL_KEY_ACTOR),
         col_iter<DeltaDecoder>(bytes, ops, COL_KEY_CTR),
-        col_iter<RleDecoder<std::string>>(bytes, ops, COL_KEY_STR)
+        col_iter<RleDecoder<std::string_view>>(bytes, ops, COL_KEY_STR)
     };
 
     value = ValueIterator{
@@ -392,7 +392,7 @@ DocOpIterator::DocOpIterator(const BinSlice& bytes, const std::vector<ActorId>& 
         &actors,
         col_iter<RleDecoder<usize>>(bytes, ops, COL_KEY_ACTOR),
         col_iter<DeltaDecoder>(bytes, ops, COL_KEY_CTR),
-        col_iter<RleDecoder<std::string>>(bytes, ops, COL_KEY_STR)
+        col_iter<RleDecoder<std::string_view>>(bytes, ops, COL_KEY_STR)
     };
 
     value = ValueIterator{
@@ -543,7 +543,7 @@ std::optional<DocChange> ChangeIterator::next() {
         **max_op_next,
         (s64) * *time_next,
         std::move(*message_next),
-        std::move(extra_next.value_or(std::vector<u8>())),
+        extra_next.value_or(std::vector<u8>()),
         {}
     };
 }
@@ -703,11 +703,11 @@ std::vector<ColData> ValEncoder::finish() {
 
 /////////////////////////////////////////////////////////
 
-void KeyEncoder::append(Key&& key, const std::vector<usize>& actors, const std::vector<std::string>& props) {
+void KeyEncoder::append(Key&& key, const std::vector<usize>& actors, const std::vector<std::string_view>& props) {
     if (key.is_map()) {
         actor.append_null();
         ctr.append_null();
-        str.append_value(std::string(props[std::get<usize>(key.data)]));
+        str.append_value(std::string_view(props[std::get<usize>(key.data)]));
 
         return;
     }
@@ -739,7 +739,7 @@ void KeyEncoderOld::append(OldKey&& key, const std::vector<ActorId>& actors) {
     if (key.is_map_key()) {
         actor.append_null();
         ctr.append_null();
-        str.append_value(std::move(std::get<std::string>(key.data)));
+        str.append_value(std::move(std::get<std::string_view>(key.data)));
 
         return;
     }
@@ -929,7 +929,7 @@ std::pair<std::vector<u8>, std::vector<u8>> ChangeEncoder::finish() {
 
 /////////////////////////////////////////////////////////
 
-void DocOpEncoder::encode(OpSetIter& ops, const std::vector<usize>& actors, const std::vector<std::string>& props) {
+void DocOpEncoder::encode(OpSetIter& ops, const std::vector<usize>& actors, const std::vector<std::string_view>& props) {
     while (true) {
         auto ops_next = ops.next();
         if (!ops_next.has_value()) {

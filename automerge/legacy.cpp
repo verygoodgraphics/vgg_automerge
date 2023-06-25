@@ -3,7 +3,7 @@
 
 #include "legacy.h"
 
-OldOp::OldOp(const Op& op, const ObjId& obj, const IndexedCache<ActorId>& actors, const IndexedCache<std::string>& props) {
+OldOp::OldOp(const Op& op, const ObjId& obj, const IndexedCache<ActorId>& actors, const IndexedCache<std::string_view>& props) {
     this->action = op.action;
 
     this->obj = OldObjectId(obj, actors);

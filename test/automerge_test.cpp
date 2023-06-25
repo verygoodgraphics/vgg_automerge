@@ -539,8 +539,8 @@ TEST_F(AutomergeTest, ChangesWithinConflictingMapField) {
 TEST_F(AutomergeTest, ChangesWithinConflictingListElement) {
     Automerge doc1;
     Automerge doc2;
-    doc1.set_actor(ActorId(std::string("01234567")));
-    doc2.set_actor(ActorId(std::string("89abcdef")));
+    doc1.set_actor(ActorId(std::string_view("01234567")));
+    doc2.set_actor(ActorId(std::string_view("89abcdef")));
 
     auto list_id = doc1.put_object(ExId(), Prop("list"), ObjType::List);
     doc1.insert(list_id, 0, ScalarValue{ ScalarValue::Str, std::string("hello") });
@@ -600,8 +600,8 @@ TEST_F(AutomergeTest, ConcurrentlyAssignedNestedMapsShouldNotMerge) {
 TEST_F(AutomergeTest, ConcurrentInsertionsAtDifferentListPositions) {
     Automerge doc1;
     Automerge doc2;
-    doc1.set_actor(ActorId(std::string("01234567")));
-    doc2.set_actor(ActorId(std::string("89abcdef")));
+    doc1.set_actor(ActorId(std::string_view("01234567")));
+    doc2.set_actor(ActorId(std::string_view("89abcdef")));
     ASSERT_TRUE(doc1.get_actor() < doc2.get_actor());
 
     auto list_id = doc1.put_object(ExId(), Prop("list"), ObjType::List);
@@ -626,8 +626,8 @@ TEST_F(AutomergeTest, ConcurrentInsertionsAtDifferentListPositions) {
 TEST_F(AutomergeTest, ConcurrentInsertionsAtSameListPositions) {
     Automerge doc1;
     Automerge doc2;
-    doc1.set_actor(ActorId(std::string("01234567")));
-    doc2.set_actor(ActorId(std::string("89abcdef")));
+    doc1.set_actor(ActorId(std::string_view("01234567")));
+    doc2.set_actor(ActorId(std::string_view("89abcdef")));
     ASSERT_TRUE(doc1.get_actor() < doc2.get_actor());
 
     auto list_id = doc1.put_object(ExId(), Prop("birds"), ObjType::List);
@@ -826,8 +826,8 @@ TEST_F(AutomergeTest, ConcurrentUpdatesOfConcurrentlyDeletedObjects) {
 TEST_F(AutomergeTest, DoesNotInterleaveSequenceInsertionsAtSamePosition) {
     Automerge doc1;
     Automerge doc2;
-    doc1.set_actor(ActorId(std::string("01234567")));
-    doc2.set_actor(ActorId(std::string("89abcdef")));
+    doc1.set_actor(ActorId(std::string_view("01234567")));
+    doc2.set_actor(ActorId(std::string_view("89abcdef")));
 
     auto wisdom = doc1.put_object(ExId(), Prop("wisdom"), ObjType::List);
     doc1.commit();
@@ -858,8 +858,8 @@ TEST_F(AutomergeTest, DoesNotInterleaveSequenceInsertionsAtSamePosition) {
 TEST_F(AutomergeTest, MultipleInsertionsAtSameListPositionWithInsertionByGreaterActorId) {
     Automerge doc1;
     Automerge doc2;
-    doc1.set_actor(ActorId(std::string("01234567")));
-    doc2.set_actor(ActorId(std::string("89abcdef")));
+    doc1.set_actor(ActorId(std::string_view("01234567")));
+    doc2.set_actor(ActorId(std::string_view("89abcdef")));
     ASSERT_TRUE(doc1.get_actor() < doc2.get_actor());
 
     auto list = doc1.put_object(ExId(), Prop("list"), ObjType::List);
@@ -878,8 +878,8 @@ TEST_F(AutomergeTest, MultipleInsertionsAtSameListPositionWithInsertionByGreater
 TEST_F(AutomergeTest, MultipleInsertionsAtSameListPositionWithInsertionByLesserActorId) {
     Automerge doc1;
     Automerge doc2;
-    doc2.set_actor(ActorId(std::string("01234567")));
-    doc1.set_actor(ActorId(std::string("89abcdef")));
+    doc2.set_actor(ActorId(std::string_view("01234567")));
+    doc1.set_actor(ActorId(std::string_view("89abcdef")));
     ASSERT_TRUE(doc2.get_actor() < doc1.get_actor());
 
     auto list = doc1.put_object(ExId(), Prop("list"), ObjType::List);
@@ -1053,7 +1053,7 @@ TEST_F(AutomergeTest, SaveRestoreComplexTransactional) {
 
 TEST_F(AutomergeTest, ListCounterDel) {
     Automerge doc1;
-    doc1.set_actor(ActorId(std::string("01234567")));
+    doc1.set_actor(ActorId(std::string_view("01234567")));
 
     auto list = doc1.put_object(ExId(), Prop("list"), ObjType::List);
     doc1.insert(list, 0, ScalarValue{ ScalarValue::Str, std::string("a") });
@@ -1062,10 +1062,10 @@ TEST_F(AutomergeTest, ListCounterDel) {
     doc1.commit();
 
     auto doc2 = Automerge::load(make_bin_slice(doc1.save()));
-    doc2.set_actor(ActorId(std::string("456789ab")));
+    doc2.set_actor(ActorId(std::string_view("456789ab")));
 
     auto doc3 = Automerge::load(make_bin_slice(doc1.save()));
-    doc3.set_actor(ActorId(std::string("89abcdef")));
+    doc3.set_actor(ActorId(std::string_view("89abcdef")));
 
     doc1.put(list, Prop(1), ScalarValue{ ScalarValue::Counter, Counter(0) });
     doc1.commit();
@@ -1215,16 +1215,16 @@ TEST_F(AutomergeTest, IncrementNonCounterList) {
 
 TEST_F(AutomergeTest, TestLocalIncInMap) {
     Automerge doc1;
-    doc1.set_actor(ActorId(std::string("01234567")));
+    doc1.set_actor(ActorId(std::string_view("01234567")));
 
     doc1.put(ExId(), Prop("hello"), ScalarValue{ ScalarValue::Str, std::string("world") });
     doc1.commit();
 
     auto doc2 = Automerge::load(make_bin_slice(doc1.save()));
-    doc2.set_actor(ActorId(std::string("456789ab")));
+    doc2.set_actor(ActorId(std::string_view("456789ab")));
 
     auto doc3 = Automerge::load(make_bin_slice(doc1.save()));
-    doc3.set_actor(ActorId(std::string("89abcdef")));
+    doc3.set_actor(ActorId(std::string_view("89abcdef")));
 
     doc1.put(ExId(), Prop("cnt"), ScalarValue{ ScalarValue::Uint, (u64)20 });
     doc1.commit();
@@ -1636,6 +1636,7 @@ TEST_F(AutomergeTest, RegressionNthMiscount) {
         auto [map_id, obj_type2] = doc.get(list_id, Prop(i)).value();
         EXPECT_EQ((Value{ Value::OBJECT, ObjType::Map }), obj_type2) << "on run " << i;
 
+        // use std::move() to change lvalue reference to rvalue reference, and call move construction
         auto obj_type3 = std::move(doc.get(map_id, Prop("test"))->second);
         EXPECT_EQ(
             (Value{ Value::SCALAR, ScalarValue{ ScalarValue::Int, (s64)i } }),
@@ -1819,9 +1820,9 @@ TEST_F(SyncTest, ShouldNotReplyIfNoData) {
 TEST_F(SyncTest, ShouldAllowSimultaneousMessageDuringSynchronisation) {
     // create & synchronize two nodes
     Automerge doc1;
-    doc1.set_actor(ActorId(std::string("abc123")));
+    doc1.set_actor(ActorId(std::string_view("abc123")));
     Automerge doc2;
-    doc2.set_actor(ActorId(std::string("def456")));
+    doc2.set_actor(ActorId(std::string_view("def456")));
     State s1;
     State s2;
 
@@ -1915,9 +1916,9 @@ TEST_F(SyncTest, ShouldHandleFalsePositiveHead) {
     // lastSync is c9.
 
     Automerge doc1;
-    doc1.set_actor(ActorId(std::string("abc123")));
+    doc1.set_actor(ActorId(std::string_view("abc123")));
     Automerge doc2;
-    doc2.set_actor(ActorId(std::string("def456")));
+    doc2.set_actor(ActorId(std::string_view("def456")));
     State s1;
     State s2;
 
@@ -1932,16 +1933,16 @@ TEST_F(SyncTest, ShouldHandleFalsePositiveHead) {
     s32 i = 0;
     while (true) {
         Automerge doc1copy = doc1;
-        doc1copy.set_actor(ActorId(std::string("01234567")));
+        doc1copy.set_actor(ActorId(std::string_view("01234567")));
         auto val1 = std::to_string(i) + " @ n1";
-        ASSERT_NO_THROW(doc1copy.put(ExId(), Prop("x"), ScalarValue{ ScalarValue::Str, std::move(val1) }));
+        ASSERT_NO_THROW(doc1copy.put(ExId(), Prop("x"), ScalarValue{ ScalarValue::Str, std::string(val1) }));
         doc1copy.commit();
 
         // should copy from doc2?
         Automerge doc2copy = doc1;
-        doc2copy.set_actor(ActorId(std::string("89abcdef")));
+        doc2copy.set_actor(ActorId(std::string_view("89abcdef")));
         auto val2 = std::to_string(i) + " @ n2";
-        ASSERT_NO_THROW(doc2copy.put(ExId(), Prop("x"), ScalarValue{ ScalarValue::Str, std::move(val2) }));
+        ASSERT_NO_THROW(doc2copy.put(ExId(), Prop("x"), ScalarValue{ ScalarValue::Str, std::string(val2) }));
         doc2copy.commit();
 
         auto heads = doc1copy.get_heads();
@@ -1977,9 +1978,9 @@ TEST_F(SyncTest, ShouldHandleChainsOfFalsePositive) {
     // lastSync is c4.
 
     Automerge doc1;
-    doc1.set_actor(ActorId(std::string("abc123")));
+    doc1.set_actor(ActorId(std::string_view("abc123")));
     Automerge doc2;
-    doc2.set_actor(ActorId(std::string("def456")));
+    doc2.set_actor(ActorId(std::string_view("def456")));
     State s1;
     State s2;
 
@@ -2000,7 +2001,7 @@ TEST_F(SyncTest, ShouldHandleChainsOfFalsePositive) {
     s32 i = 0;
     while (true) {
         Automerge doc = doc2;
-        doc2.set_actor(ActorId(std::string("89abcdef")));
+        doc2.set_actor(ActorId(std::string_view("89abcdef")));
 
         ASSERT_NO_THROW(doc.put(ExId(), Prop("x"), 
             ScalarValue{ ScalarValue::Str, std::to_string(i) + " at 89abdef" }));
@@ -2018,7 +2019,7 @@ TEST_F(SyncTest, ShouldHandleChainsOfFalsePositive) {
     i = 0;
     while (true) {
         Automerge doc = doc2;
-        doc2.set_actor(ActorId(std::string("89abcdef")));
+        doc2.set_actor(ActorId(std::string_view("89abcdef")));
 
         ASSERT_NO_THROW(doc.put(ExId(), Prop("x"),
             ScalarValue{ ScalarValue::Str, std::to_string(i) + " again" }));
@@ -2047,11 +2048,11 @@ TEST_F(SyncTest, ShouldHandleChainsOfFalsePositive) {
 
 TEST_F(SyncTest, ShouldHandleLotsOfBranchingAndMerging) {
     Automerge doc1;
-    doc1.set_actor(ActorId(std::string("01234567")));
+    doc1.set_actor(ActorId(std::string_view("01234567")));
     Automerge doc2;
-    doc2.set_actor(ActorId(std::string("89abcdef")));
+    doc2.set_actor(ActorId(std::string_view("89abcdef")));
     Automerge doc3;
-    doc3.set_actor(ActorId(std::string("fedcba98")));
+    doc3.set_actor(ActorId(std::string_view("fedcba98")));
     State s1;
     State s2;
 

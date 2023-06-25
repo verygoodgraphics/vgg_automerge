@@ -5,6 +5,7 @@
 
 #include <functional>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <unordered_map>
 #include <utility>
@@ -40,7 +41,7 @@ struct ChangeHash {
     ChangeHash() = default;
     ChangeHash(const std::vector<u8>& vec);
     ChangeHash(const BinSlice& bin);
-    ChangeHash(const std::string& hex_str);
+    ChangeHash(const std::string_view& hex_str);
 
     bool operator==(const ChangeHash& other) const {
         return (cmp(other) == 0);
@@ -76,7 +77,7 @@ struct ActorId {
     ActorId(bool random = false);
     ActorId(const std::vector<u8>& slice);
     ActorId(const BinSlice& slice);
-    ActorId(const std::string& hex_str);
+    ActorId(const std::string_view& hex_str);
 
     bool operator==(const ActorId& other) const {
         return (cmp(other) == 0);

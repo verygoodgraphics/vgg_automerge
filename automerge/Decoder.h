@@ -55,7 +55,11 @@ public:
 
     static void decode(BinSlice& bytes, std::optional<std::string>& val);
 
+    static void decode(BinSlice& bytes, std::optional<std::string_view>& val);
+
     static void decode(BinSlice& bytes, std::optional<std::optional<std::string>>& val);
+
+    static void decode(BinSlice& bytes, std::optional<std::optional<std::string_view>>& val);
 
     static void decode(BinSlice& bytes, std::optional<ActorId>& val);
 

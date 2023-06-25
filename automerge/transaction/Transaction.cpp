@@ -30,7 +30,7 @@ ChangeHash TransactionInner::commit(Automerge& doc, std::optional<std::string>&&
     return hash;
 }
 
-Change TransactionInner::export_change(const IndexedCache<ActorId>& actors, const IndexedCache<std::string>& props) {
+Change TransactionInner::export_change(const IndexedCache<ActorId>& actors, const IndexedCache<std::string_view>& props) {
     std::vector<OldOp> old_operations;
     for (auto& [obj, prop, op] : operations) {
         old_operations.emplace_back(op, obj, actors, props);
@@ -173,7 +173,7 @@ std::optional<OpId> TransactionInner::local_map_op(Automerge& doc, ObjId& obj, s
     }
 
     OpId id = next_id();
-    usize prop_index = doc.ops.m.props.cache(std::string(prop));
+    usize prop_index = doc.ops.m.props.cache(prop);
     auto q = QueryProp(prop_index);
     auto& query = static_cast<QueryProp&>(doc.ops.search(obj, q));
 

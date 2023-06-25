@@ -12,7 +12,7 @@
 #include "picosha2.h"
 
 std::vector<u8> encode_document(std::vector<ChangeHash>&& heads, const std::vector<Change>& changes,
-    OpSetIter&& doc_ops, const IndexedCache<ActorId>& actors_index, const std::vector<std::string>& props)
+    OpSetIter&& doc_ops, const IndexedCache<ActorId>& actors_index, const std::vector<std::string_view>& props)
 {
     auto actors_map = actors_index.encode_index();
     auto actors = actors_index.sorted();

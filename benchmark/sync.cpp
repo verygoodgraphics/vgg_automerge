@@ -57,7 +57,7 @@ static void sync_unidirectional(benchmark::State& state) {
         sync(doc1, doc2);
     }
 }
-BENCHMARK(sync_unidirectional)->Arg(100)->Arg(1000)->Arg(10000);
+//BENCHMARK(sync_unidirectional)->Arg(100)->Arg(1000)->Arg(10000);
 
 static void sync_unidirectional_every_change(benchmark::State& state) {
     for (auto _ : state) {
@@ -72,6 +72,6 @@ static void sync_unidirectional_every_change(benchmark::State& state) {
         }
     }
 }
-BENCHMARK(sync_unidirectional_every_change)->Arg(100)->Arg(1000)->Arg(10000);
+//BENCHMARK(sync_unidirectional_every_change)->Arg(100)->Arg(1000)->Arg(10000);
 
 BENCHMARK_MAIN();

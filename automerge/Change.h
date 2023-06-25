@@ -27,7 +27,7 @@ constexpr usize CHUNK_START = 8;
 constexpr Range HASH_RANGE = { 4, 8 };
 
 std::vector<u8> encode_document(std::vector<ChangeHash>&& heads, const std::vector<Change>& changes,
-    OpSetIter&& doc_ops, const IndexedCache<ActorId>& actors_index, const std::vector<std::string>& props);
+    OpSetIter&& doc_ops, const IndexedCache<ActorId>& actors_index, const std::vector<std::string_view>& props);
 
 struct ChangeBytes {
     bool isCompressed = false;

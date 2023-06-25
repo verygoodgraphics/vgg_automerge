@@ -4,6 +4,7 @@
 #include <limits>
 
 #include "Decoder.h"
+#include "helper.h"
 #include "leb128.h"
 
 void Decoding::decode_u8(BinSlice& bytes, std::optional<u8>& val) {
@@ -76,6 +77,18 @@ void Decoding::decode(BinSlice& bytes, std::optional<std::string>& val) {
     }
 }
 
+void Decoding::decode(BinSlice& bytes, std::optional<std::string_view>& val) {
+    std::optional<std::string> result;
+    decode(bytes, result);
+
+    if (!result.has_value()) {
+        val.reset();
+    }
+    else {
+        val = cache_string(*result);
+    }
+}
+
 void Decoding::decode(BinSlice& bytes, std::optional<std::optional<std::string>>& val) {
     std::optional<std::vector<u8>> result;
     decode(bytes, result);
@@ -88,6 +101,21 @@ void Decoding::decode(BinSlice& bytes, std::optional<std::optional<std::string>>
     }
     else {
         val = std::optional<std::string>(std::string(result->cbegin(), result->cend()));
+    }
+}
+
+void Decoding::decode(BinSlice& bytes, std::optional<std::optional<std::string_view>>& val) {
+    std::optional<std::optional<std::string>> result;
+    decode(bytes, result);
+
+    if (!result.has_value()) {
+        val.reset();
+    }
+    else if (!result->has_value()) {
+        val = std::optional<std::string_view>();
+    }
+    else {
+        val = std::optional<std::string_view>(cache_string(**result));
     }
 }
 

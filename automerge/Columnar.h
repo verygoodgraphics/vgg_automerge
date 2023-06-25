@@ -85,7 +85,7 @@ struct KeyIterator {
     const std::vector<ActorId>* actors = nullptr;
     RleDecoder<usize> actor = {};
     DeltaDecoder ctr = {};
-    RleDecoder<std::string> str = {};
+    RleDecoder<std::string_view> str = {};
 
     std::optional<OldKey> next();
 };
@@ -223,11 +223,11 @@ struct ValEncoder {
 struct KeyEncoder {
     RleEncoder<usize> actor = {};
     DeltaEncoder ctr = {};
-    RleEncoder<std::string> str = {};
+    RleEncoder<std::string_view> str = {};
 
     const usize COLUMNS = 3;
 
-    void append(Key&& key, const std::vector<usize>& actors, const std::vector<std::string>& props);
+    void append(Key&& key, const std::vector<usize>& actors, const std::vector<std::string_view>& props);
 
     std::vector<ColData> finish();
 };
@@ -235,7 +235,7 @@ struct KeyEncoder {
 struct KeyEncoderOld {
     RleEncoder<usize> actor = {};
     DeltaEncoder ctr = {};
-    RleEncoder<std::string> str = {};
+    RleEncoder<std::string_view> str = {};
 
     const usize COLUMNS = 3;
 
@@ -327,7 +327,7 @@ struct DocOpEncoder {
     SuccEncoder succ = {};
 
     static auto encode_doc_ops(OpSetIter& ops, const std::vector<usize>& actors,
-        const std::vector<std::string>& props) -> std::pair<std::vector<u8>, std::vector<u8>>
+        const std::vector<std::string_view>& props) -> std::pair<std::vector<u8>, std::vector<u8>>
     {
         DocOpEncoder e;
 
@@ -335,7 +335,7 @@ struct DocOpEncoder {
         return e.finish();
     }
 
-    void encode(OpSetIter& ops, const std::vector<usize>& actors, const std::vector<std::string>& props);
+    void encode(OpSetIter& ops, const std::vector<usize>& actors, const std::vector<std::string_view>& props);
 
     auto finish() -> std::pair<std::vector<u8>, std::vector<u8>>;
 };

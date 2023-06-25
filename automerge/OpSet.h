@@ -36,7 +36,7 @@ struct OpSetIter {
 
 struct OpSetMetadata {
     IndexedCache<ActorId> actors;
-    IndexedCache<std::string> props;
+    IndexedCache<std::string_view> props;
 
     int key_cmp(const Key& left, const Key& right) const;
 
