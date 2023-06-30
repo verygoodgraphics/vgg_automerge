@@ -26,10 +26,10 @@ using s16 = std::int16_t;
 using s8 = std::int8_t;
 using usize = std::size_t;
 
-typedef std::pair<usize, usize> Range;
-typedef std::vector<usize> VecPos;
-typedef std::vector<u8>::const_iterator BinIter;
-typedef std::pair<BinIter, usize> BinSlice;
+using Range = std::pair<usize, usize>;
+using VecPos = std::vector<usize>;
+using BinIter = std::vector<u8>::const_iterator;
+using BinSlice = std::pair<BinIter, usize>;
 
 // The number of bytes in a change hash.
 constexpr usize HASH_SIZE = 32; // 256 bits = 32 bytes
@@ -123,12 +123,12 @@ struct std::hash<OpId> {
         return std::hash<u64>{}(id.counter) ^ (std::hash<usize>{}(id.actor) << 1);
     }
 };
-typedef std::function<int(const OpId&, const OpId&)> OpIdCmpFunc;
+using OpIdCmpFunc = std::function<int(const OpId&, const OpId&)>;
 
-typedef std::vector<ActorId> ActorMap;
+using ActorMap = std::vector<ActorId> ;
 // #[derive(Debug, Clone, Copy, PartialOrd, Eq, PartialEq, Ord, Hash, Default)]
-typedef OpId ObjId;
-typedef OpId ElemId;
+using ObjId = OpId;
+using ElemId = OpId;
 
 constexpr ElemId HEAD = ElemId{ 0, 0 };
 constexpr OpId ROOT = OpId{ 0, 0 };

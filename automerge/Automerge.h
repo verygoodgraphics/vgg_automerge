@@ -33,8 +33,8 @@ struct Actor {
     usize cached = 0;
 };
 
-typedef std::function<std::vector<ExId>(Transaction&)> TransactionFunc;
-typedef std::function<CommitOptions<OpObserver>(const std::vector<ExId>&)> CommitOptionsFunc;
+using TransactionFunc = std::function<std::vector<ExId>(Transaction&)>;
+using CommitOptionsFunc = std::function<CommitOptions<OpObserver>(const std::vector<ExId>&)>;
 
 struct Automerge {
     // The list of unapplied changes that are not causally ready.

@@ -4,7 +4,7 @@
 #include <limits>
 
 #include "Decoder.h"
-#include "helper.h"
+#include "StringCache.h"
 #include "leb128.h"
 
 void Decoding::decode_u8(BinSlice& bytes, std::optional<u8>& val) {
@@ -85,7 +85,7 @@ void Decoding::decode(BinSlice& bytes, std::optional<std::string_view>& val) {
         val.reset();
     }
     else {
-        val = cache_string(*result);
+        val = g_cache_string(*result).second;
     }
 }
 
@@ -115,7 +115,7 @@ void Decoding::decode(BinSlice& bytes, std::optional<std::optional<std::string_v
         val = std::optional<std::string_view>();
     }
     else {
-        val = std::optional<std::string_view>(cache_string(**result));
+        val = std::optional<std::string_view>(g_cache_string(**result).second);
     }
 }
 

@@ -5,6 +5,7 @@
 
 #include "Transaction.h"
 #include "../Automerge.h"
+#include "../StringCache.h"
 #include "../query/Nth.h"
 #include "../query/QueryProp.h"
 #include "../query/InsertNth.h"
@@ -173,7 +174,7 @@ std::optional<OpId> TransactionInner::local_map_op(Automerge& doc, ObjId& obj, s
     }
 
     OpId id = next_id();
-    usize prop_index = doc.ops.m.props.cache(prop);
+    usize prop_index = doc.ops.m.cache_prop(prop);
     auto q = QueryProp(prop_index);
     auto& query = static_cast<QueryProp&>(doc.ops.search(obj, q));
 

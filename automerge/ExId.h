@@ -56,10 +56,10 @@ struct ExId {
     }
 };
 
-typedef std::pair<ExId, Prop> PropPair;
-typedef std::pair<ExId, Value> ValuePair;
-typedef std::tuple<ExId, Value, PropPair> ValueTuple;
-typedef std::pair<ExId, s64> S64Pair;
+using PropPair = std::pair<ExId, Prop>;
+using ValuePair = std::pair<ExId, Value>;
+using ValueTuple = std::tuple<ExId, Value, PropPair>;
+using S64Pair = std::pair<ExId, s64>;
 
 struct JsonPathParsed {
     enum {

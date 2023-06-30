@@ -13,6 +13,7 @@
 #include "ExId.h"
 #include "Query.h"
 #include "IndexedCache.h"
+#include "StringCache.h"
 #include "legacy.h"
 #include "OpTree.h"
 #include "query/QueryKeys.h"
@@ -34,9 +35,41 @@ struct OpSetIter {
     std::optional<std::pair<const ObjId*, const Op*>> next();
 };
 
+extern IndexedCache<std::string_view> StringIndexedCache;
+
 struct OpSetMetadata {
     IndexedCache<ActorId> actors;
-    IndexedCache<std::string_view> props;
+    IndexedCache<std::string_view>& props = StringIndexedCache;
+
+    OpSetMetadata() = default;
+
+    OpSetMetadata(const OpSetMetadata& b) : actors(b.actors) {
+    }
+
+    OpSetMetadata(OpSetMetadata&& b) noexcept : actors(std::move(b.actors)) {
+    }
+
+    OpSetMetadata& operator=(const OpSetMetadata& b) {
+        actors = b.actors;
+        return *this;
+    }
+
+    OpSetMetadata& operator=(OpSetMetadata&& b) noexcept {
+        actors = std::move(b.actors);
+        return *this;
+    }
+
+    usize cache_actor(ActorId&& item) {
+        return actors.cache(std::move(item));
+    }
+
+    usize cache_prop(const std::string_view& item) {
+        return props.cache(std::string_view(item));
+    }
+
+    usize cache_prop(const std::string& item) {
+        return g_cache_string(item).first;
+    }
 
     int key_cmp(const Key& left, const Key& right) const;
 
@@ -52,10 +85,6 @@ struct OpSetMetadata {
         return OpIds::new_if_sorted(std::move(opids), [&](const OpId& left, const OpId& right) {
             return lamport_cmp(left, right);
             });
-    }
-
-    usize import_prop(std::string&& key) {
-        return props.cache(std::move(key));
     }
 
     OpIds import_opids(std::vector<OldOpId>&& external_opids);
@@ -112,4 +141,4 @@ private:
     usize length = 0;
 };
 
-typedef OpSetInternal OpSet;
+using OpSet = OpSetInternal;

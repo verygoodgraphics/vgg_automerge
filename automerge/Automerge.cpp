@@ -24,7 +24,7 @@ usize Automerge::get_actor_index() {
         return actor.cached;
     }
 
-    usize index = ops.m.actors.cache(std::move(actor.unused));
+    usize index = ops.m.cache_actor(std::move(actor.unused));
     actor.isUsed = true;
     actor.cached = index;
 
@@ -306,7 +306,7 @@ std::vector<std::pair<ObjId, Op>> Automerge::imports_ops(const Change& change) {
     usize i = 0;
     std::optional<OldOp> c;
     while ((c = op_iter.next())) {
-        usize actor = ops.m.actors.cache(ActorId(change.actor_id()));
+        usize actor = ops.m.cache_actor(ActorId(change.actor_id()));
         OpId id{ change.start_op + i, std::move(actor) };
 
         ObjId obj;
@@ -315,14 +315,14 @@ std::vector<std::pair<ObjId, Op>> Automerge::imports_ops(const Change& change) {
         }
         else {
             obj.counter = c->obj.id.counter;
-            obj.actor = ops.m.actors.cache(std::move(c->obj.id.actor));
+            obj.actor = ops.m.cache_actor(std::move(c->obj.id.actor));
         }
 
         auto pred = ops.m.import_opids(std::move(c->pred));
 
         Key key;
         if (c->key.tag == OldKey::MAP) {
-            key = Key{ Key::Map, ops.m.props.cache(std::get<std::string_view>(std::move(c->key.data))) };
+            key = Key{ Key::Map, ops.m.cache_prop(std::get<std::string_view>(std::move(c->key.data))) };
         }
         else {
             auto& elem_id = std::get<OldElementId>(c->key.data);
@@ -330,7 +330,7 @@ std::vector<std::pair<ObjId, Op>> Automerge::imports_ops(const Change& change) {
                 key = Key{ Key::Seq, HEAD };
             }
             else {
-                key = Key{ Key::Seq, ElemId{ elem_id.id.counter, ops.m.actors.cache(std::move(elem_id.id.actor)) } };
+                key = Key{ Key::Seq, ElemId{ elem_id.id.counter, ops.m.cache_actor(std::move(elem_id.id.actor)) } };
             }
         }
 
@@ -548,7 +548,7 @@ usize Automerge::update_history(Change&& change, usize num_pos) {
 
     usize histroy_index = histroy.size();
 
-    usize actor_index = ops.m.actors.cache(ActorId(change.actor_id()));
+    usize actor_index = ops.m.cache_actor(ActorId(change.actor_id()));
     states[actor_index].push_back(histroy_index);
 
     this->histroy_index.insert({ change.hash, histroy_index });
