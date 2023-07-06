@@ -222,7 +222,6 @@ Change Change::from_old_change(OldChange&& change) {
     increment_range(chunk.extra_bytes, body_start);
     increment_range_map(chunk.ops, body_start);
 
-    // TODO: why not move?
     vector_extend(bytes, std::move(chunk.bytes));
 
     std::vector<u8> hash_result(picosha2::k_digest_size);
