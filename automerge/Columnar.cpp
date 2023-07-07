@@ -770,12 +770,7 @@ std::vector<ColData> KeyEncoderOld::finish() {
 
 void SuccEncoder::append(const std::vector<OpId>& succ, const std::vector<usize>& actors) {
     num.append_value(succ.size());
-    std::vector<OpId> sorted_succ = succ;
-    std::stable_sort(sorted_succ.begin(), sorted_succ.end(), [&](const OpId& a, const OpId& b) {
-        return a.succ_ord(b, actors) < 0;
-        });
-
-    for (auto& s : sorted_succ) {
+    for (auto& s : succ) {
         ctr.append_value(s.counter);
         usize actor_index = actors[s.actor];
         actor.append_value(std::move(actor_index));

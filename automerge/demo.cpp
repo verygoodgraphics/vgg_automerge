@@ -323,6 +323,13 @@ static void map_save_decreasing_put() {
     }
 }
 
+static void map_load_repeated_put() {
+    auto bytes = repeated_put(10000).save();
+    for (int i = 0; i < 100; ++i) {
+        Automerge::load(make_bin_slice(bytes));
+    }
+}
+
 static void map_load_decreasing_put() {
     auto bytes = decreasing_put(10000).save();
 
@@ -357,11 +364,13 @@ int main()
 
     //map_repeated_put();
 
-    map_repeated_increment();
+    //map_repeated_increment();
 
     //map_decreasing_put();
 
     //map_save_decreasing_put();
+
+    map_load_repeated_put();
 
     //map_load_decreasing_put();
 

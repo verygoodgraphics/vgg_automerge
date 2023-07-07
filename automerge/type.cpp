@@ -33,6 +33,10 @@ ChangeHash::ChangeHash(const std::string_view& hex_str) {
 }
 
 int ChangeHash::cmp(const ChangeHash& other) const {
+    if (&other == this) {
+        return 0;
+    }
+
     for (usize i = 0; i < HASH_SIZE; ++i) {
         if (data[i] < other.data[i])
             return -1;
@@ -106,6 +110,10 @@ ActorId::ActorId(const std::string_view& hex_str) {
 }
 
 int ActorId::cmp(const ActorId& other) const {
+    if (&other == this) {
+        return 0;
+    }
+
     for (usize i = 0; i < ACTOR_ID_SIZE; ++i) {
         if (data[i] < other.data[i])
             return -1;

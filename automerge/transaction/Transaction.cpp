@@ -203,6 +203,7 @@ std::optional<OpId> TransactionInner::local_map_op(Automerge& doc, ObjId& obj, s
     }
 
     std::vector<OpId> pred;
+    pred.reserve(query.ops.size());
     for (auto op : query.ops) {
         pred.push_back(op->id);
     }
@@ -229,6 +230,7 @@ std::optional<OpId> TransactionInner::local_list_op(Automerge& doc, ObjId& obj, 
 
     OpId id = next_id();
     std::vector<OpId> pred;
+    pred.reserve(query.ops.size());
     for (auto op : query.ops) {
         pred.push_back(op->id);
     }
