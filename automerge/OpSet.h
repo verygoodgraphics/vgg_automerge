@@ -128,9 +128,9 @@ public:
 
     void insert(usize index, const ObjId& obj, Op&& element);
 
-    Op&& insert_op(const ObjId& obj, Op&& op);
+    void insert_op(const ObjId& obj, Op&& op);
 
-    Op&& insert_op_with_observer(const ObjId& obj, Op&& op, OpObserver& observer);
+    void insert_op_with_observer(const ObjId& obj, Op&& op, OpObserver& observer);
 
     std::optional<ObjType> object_type(const ObjId& id) const;
 

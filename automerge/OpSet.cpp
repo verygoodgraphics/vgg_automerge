@@ -45,7 +45,14 @@ int OpSetMetadata::key_cmp(const Key& left, const Key& right) const {
     if (!left.is_map() || !right.is_map())
         throw std::invalid_argument("left or right is not map");
 
-    return props[std::get<usize>(left.data)].compare(props[std::get<usize>(right.data)]);
+    auto left_index = std::get<usize>(left.data);
+    auto right_index = std::get<usize>(right.data);
+
+    if (left_index == right_index) {
+        return 0;
+    }
+
+    return props[left_index].compare(props[right_index]);
 }
 
 int OpSetMetadata::lamport_cmp(const OpId& left, const OpId& right) const {
@@ -188,7 +195,7 @@ void OpSetInternal::insert(usize index, const ObjId& obj, Op&& element) {
     }
 }
 
-Op&& OpSetInternal::insert_op(const ObjId& obj, Op&& op) {
+void OpSetInternal::insert_op(const ObjId& obj, Op&& op) {
     auto query = SeekOp(op);
     auto& q = static_cast<SeekOp&>(search(obj, query));
 
@@ -198,14 +205,14 @@ Op&& OpSetInternal::insert_op(const ObjId& obj, Op&& op) {
     add_succ(obj, succ, op);
 
     if (!op.is_delete()) {
-        insert(pos, obj, Op(op));
+        insert(pos, obj, std::move(op));
     }
 
-    return std::move(op);
+    return;
 }
 
 // TODO: add parents param to observer
-Op&& OpSetInternal::insert_op_with_observer(const ObjId& obj, Op&& op, OpObserver& observer) {
+void OpSetInternal::insert_op_with_observer(const ObjId& obj, Op&& op, OpObserver& observer) {
     auto query = SeekOpWithPatch(op);
     auto& q = static_cast<SeekOpWithPatch&>(search(obj, query));
 
@@ -284,10 +291,10 @@ Op&& OpSetInternal::insert_op_with_observer(const ObjId& obj, Op&& op, OpObserve
     add_succ(obj, succ, op);
 
     if (!op.is_delete()) {
-        insert(pos, obj, Op(op));
+        insert(pos, obj, std::move(op));
     }
 
-    return std::move(op);
+    return;
 }
 
 std::optional<ObjType> OpSetInternal::object_type(const ObjId& id) const {
