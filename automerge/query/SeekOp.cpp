@@ -22,15 +22,19 @@ QueryResult SeekOp::query_node_with_metadata(const OpTreeNode& child, const OpSe
     }
 
     if (op.key.tag == Key::Map) {
-        auto start = binary_search_by(child, [&](const Op* op) {
-            return m.key_cmp(op->key, this->op.key);
-        });
-        pos = start;
-        return QueryResult{ QueryResult::SKIP, start };
+        auto cmp = m.key_cmp(child.last().key, this->op.key);
+        if (cmp < 0 ||
+            (cmp == 0 && !child.index.has_visible(this->op.key))) {
+            pos += child.len();
+            return QueryResult{ QueryResult::NEXT, 0 };
+        }
+
+        return QueryResult{ QueryResult::DESCEND, 0 };
     }
     else if (std::get<ElemId>(op.key.data) == HEAD) {
         while (pos < child.len()) {
-            auto op = *(child.get(pos));
+            auto op_optional = child.get(pos);
+            auto op = *op_optional;
             if (op->insert && (m.lamport_cmp(op->id, this->op.id) < 0)) {
                 break;
             }
@@ -51,17 +55,20 @@ QueryResult SeekOp::query_node_with_metadata(const OpTreeNode& child, const OpSe
 
 QueryResult SeekOp::query_element_with_metadata(const Op& e, const OpSetMetadata& m) {
     if (op.key.tag == Key::Map) {
-        // don't bother looking at things past our key
-        if (!(e.key == op.key)) {
+        auto cmp = m.key_cmp(e.key, this->op.key);
+
+        if (cmp > 0) {
             return QueryResult{ QueryResult::FINISH, 0 };
         }
 
-        if (op.overwrites(e)) {
-            succ.push_back(pos);
-        }
+        if (cmp == 0) {
+            if (op.overwrites(e)) {
+                succ.push_back(pos);
+            }
 
-        if (m.lamport_cmp(e.id, op.id) > 0) {
-            return QueryResult{ QueryResult::FINISH, 0 };
+            if (m.lamport_cmp(e.id, op.id) > 0) {
+                return QueryResult{ QueryResult::FINISH, 0 };
+            }
         }
 
         ++pos;

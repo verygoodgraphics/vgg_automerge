@@ -16,7 +16,7 @@
 
 struct SeekOp : public TreeQuery {
     // the op we are looking for
-    Op op;
+    const Op& op;
     // The position to insert at
     usize pos;
     // The indices of ops that this op overwrites
