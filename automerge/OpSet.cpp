@@ -27,7 +27,7 @@ std::optional<std::pair<const ObjId*, const Op*>> OpSetIter::next() {
 
     while (true) {
         auto tree_next = trees.next();
-        if (!tree_next) {
+        if (!tree_next.has_value()) {
             return {};
         }
 
@@ -45,7 +45,14 @@ int OpSetMetadata::key_cmp(const Key& left, const Key& right) const {
     if (!left.is_map() || !right.is_map())
         throw std::invalid_argument("left or right is not map");
 
-    return props[std::get<usize>(left.data)].compare(props[std::get<usize>(right.data)]);
+    auto left_index = std::get<usize>(left.data);
+    auto right_index = std::get<usize>(right.data);
+
+    if (left_index == right_index) {
+        return 0;
+    }
+
+    return props[left_index].compare(props[right_index]);
 }
 
 int OpSetMetadata::lamport_cmp(const OpId& left, const OpId& right) const {
@@ -78,7 +85,7 @@ OpSetIter OpSetInternal::iter() const {
     std::vector<std::pair<const ObjId*, const OpTree*>> objs;
     objs.reserve(trees.size());
     for (auto& tree : trees) {
-        objs.push_back({ &tree.first, &tree.second });
+        objs.emplace_back(&tree.first, &tree.second);
     }
 
     // TODO: why need stable sort?
@@ -90,12 +97,12 @@ OpSetIter OpSetInternal::iter() const {
 }
 
 std::optional<std::pair<ObjId, Key>> OpSetInternal::parent_object(const ObjId& obj) const {
-    if (trees.count(obj) == 0 || !trees.at(obj).parent)
+    if (trees.count(obj) == 0 || !trees.at(obj).parent.has_value())
         return std::nullopt;
     auto& parent = *(trees.at(obj).parent);
     auto query = OpIdSearch(obj);
     auto& key = static_cast<OpIdSearch&>(search(parent, query)).key;
-    if (!key) {
+    if (!key.has_value()) {
         throw std::runtime_error("not found");
     }
 
@@ -188,7 +195,7 @@ void OpSetInternal::insert(usize index, const ObjId& obj, Op&& element) {
     }
 }
 
-Op&& OpSetInternal::insert_op(const ObjId& obj, Op&& op) {
+void OpSetInternal::insert_op(const ObjId& obj, Op&& op) {
     auto query = SeekOp(op);
     auto& q = static_cast<SeekOp&>(search(obj, query));
 
@@ -198,14 +205,14 @@ Op&& OpSetInternal::insert_op(const ObjId& obj, Op&& op) {
     add_succ(obj, succ, op);
 
     if (!op.is_delete()) {
-        insert(pos, obj, Op(op));
+        insert(pos, obj, std::move(op));
     }
 
-    return std::move(op);
+    return;
 }
 
 // TODO: add parents param to observer
-Op&& OpSetInternal::insert_op_with_observer(const ObjId& obj, Op&& op, OpObserver& observer) {
+void OpSetInternal::insert_op_with_observer(const ObjId& obj, Op&& op, OpObserver& observer) {
     auto query = SeekOpWithPatch(op);
     auto& q = static_cast<SeekOpWithPatch&>(search(obj, query));
 
@@ -219,7 +226,7 @@ Op&& OpSetInternal::insert_op_with_observer(const ObjId& obj, Op&& op, OpObserve
     Prop key;
     if (op.key.tag == Key::Map) {
         key.tag = Prop::Map;
-        key.data = m.props[std::get<usize>(op.key.data)];
+        key.data = std::string(m.props[std::get<usize>(op.key.data)]);
     }
     else {
         key.tag = Prop::Seq;
@@ -283,10 +290,10 @@ Op&& OpSetInternal::insert_op_with_observer(const ObjId& obj, Op&& op, OpObserve
     add_succ(obj, succ, op);
 
     if (!op.is_delete()) {
-        insert(pos, obj, Op(op));
+        insert(pos, obj, std::move(op));
     }
 
-    return std::move(op);
+    return;
 }
 
 std::optional<ObjType> OpSetInternal::object_type(const ObjId& id) const {

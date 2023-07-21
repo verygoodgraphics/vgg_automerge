@@ -32,7 +32,7 @@ std::optional<ChangeHash> ChangeGraph::add_change(const Change& change, usize ac
 u32 ChangeGraph::add_node(usize actor_index, const Change& change) {
     u32 idx = (u32)nodes.size();
     auto hash_idx = add_hash(ChangeHash(change.hash));
-    nodes.push_back(ChangeNode{
+    nodes.push_back({
         hash_idx,
         actor_index,
         change.seq,
@@ -45,7 +45,7 @@ u32 ChangeGraph::add_node(usize actor_index, const Change& change) {
 
 u32 ChangeGraph::add_hash(ChangeHash&& hash) {
     u32 idx = (u32)hashes.size();
-    hashes.push_back(hash);
+    hashes.push_back(std::move(hash));
 
     return idx;
 }
@@ -105,8 +105,7 @@ void ChangeGraph::traverse_ancestors(
 
     std::set<u32> visited;
     while (!to_visit.empty()) {
-        auto idx = to_visit.back();
-        to_visit.pop_back();
+        auto idx = vector_pop(to_visit);
 
         if (visited.count(idx)) {
             continue;
@@ -121,7 +120,7 @@ void ChangeGraph::traverse_ancestors(
 
         // fn parents
         auto edge_idx = nodes[idx].parents;
-        while (!edge_idx) {
+        while (edge_idx.has_value()) {
             auto& edge = edges[*edge_idx];
             edge_idx = edge.next;
             to_visit.push_back(edge.target);

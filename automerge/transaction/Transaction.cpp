@@ -5,6 +5,7 @@
 
 #include "Transaction.h"
 #include "../Automerge.h"
+#include "../StringCache.h"
 #include "../query/Nth.h"
 #include "../query/QueryProp.h"
 #include "../query/InsertNth.h"
@@ -30,13 +31,13 @@ ChangeHash TransactionInner::commit(Automerge& doc, std::optional<std::string>&&
     return hash;
 }
 
-Change TransactionInner::export_change(const IndexedCache<ActorId>& actors, const IndexedCache<std::string>& props) {
+Change TransactionInner::export_change(const IndexedCache<ActorId>& actors, const IndexedCache<std::string_view>& props) {
     std::vector<OldOp> old_operations;
     for (auto& [obj, prop, op] : operations) {
-        old_operations.push_back(OldOp(op, obj, actors, props));
+        old_operations.emplace_back(op, obj, actors, props);
     }
 
-    return OldChange{
+    return Change::from_old_change(OldChange{
         std::move(old_operations),
         actors.get(actor),
         std::move(hash),
@@ -46,7 +47,7 @@ Change TransactionInner::export_change(const IndexedCache<ActorId>& actors, cons
         std::move(message),
         std::move(deps),
         std::move(extra_bytes)
-    }.encode();
+    });
 }
 
 void TransactionInner::put(Automerge& doc, const ExId& ex_obj, Prop&& prop, ScalarValue&& value) {
@@ -111,7 +112,7 @@ void TransactionInner::insert_local_op(Automerge& doc, Prop&& prop, Op&& op, usi
         doc.ops.insert(pos, obj, Op(op));
     }
 
-    operations.push_back({ obj, std::move(prop), std::move(op) });
+    operations.emplace_back(obj, std::move(prop), std::move(op));
 }
 
 void TransactionInner::insert(Automerge& doc, const ExId& ex_obj, usize index, ScalarValue&& value) {
@@ -153,7 +154,7 @@ OpId TransactionInner::do_insert(Automerge& doc, ObjId& obj, usize index, OpType
     };
 
     doc.ops.insert(query.pos(), obj, Op(op));
-    operations.push_back({ obj, Prop(index), std::move(op) });
+    operations.emplace_back(obj, Prop(index), std::move(op));
 
     return id;
 }
@@ -173,7 +174,7 @@ std::optional<OpId> TransactionInner::local_map_op(Automerge& doc, ObjId& obj, s
     }
 
     OpId id = next_id();
-    usize prop_index = doc.ops.m.props.cache(std::string(prop));
+    usize prop_index = doc.ops.m.cache_prop(prop);
     auto q = QueryProp(prop_index);
     auto& query = static_cast<QueryProp&>(doc.ops.search(obj, q));
 
@@ -202,6 +203,7 @@ std::optional<OpId> TransactionInner::local_map_op(Automerge& doc, ObjId& obj, s
     }
 
     std::vector<OpId> pred;
+    pred.reserve(query.ops.size());
     for (auto op : query.ops) {
         pred.push_back(op->id);
     }
@@ -228,6 +230,7 @@ std::optional<OpId> TransactionInner::local_list_op(Automerge& doc, ObjId& obj, 
 
     OpId id = next_id();
     std::vector<OpId> pred;
+    pred.reserve(query.ops.size());
     for (auto op : query.ops) {
         pred.push_back(op->id);
     }

@@ -10,7 +10,7 @@
 
 #include "type.h"
 
-typedef std::pair<u64, ActorId> ActorIdPair;
+using ActorIdPair = std::pair<u64, ActorId>;
 
 struct  AutomergeError {
     enum {

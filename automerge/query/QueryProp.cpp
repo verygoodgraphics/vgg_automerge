@@ -5,22 +5,29 @@
 #include "../OpSet.h"
 
 QueryResult QueryProp::query_node_with_metadata(const OpTreeNode& child, const OpSetMetadata& m) {
-    auto start = binary_search_by(child, [&](const Op* op) {
-        return m.key_cmp(op->key, this->key);
-    });
-    pos = start;
-    return QueryResult{ QueryResult::SKIP, start };
+    auto cmp = m.key_cmp(child.last().key, this->key);
+    if (cmp < 0 ||
+        (cmp == 0 && !child.index.has_visible(this->key))) {
+        pos += child.len();
+        return QueryResult{ QueryResult::NEXT, 0 };
+    }
+
+    return QueryResult{ QueryResult::DESCEND, 0 };
 }
 
-QueryResult QueryProp::query_element(const Op& op) {
-    // don't bother looking at things past our key
-    if (!(op.key == key)) {
+QueryResult QueryProp::query_element_with_metadata(const Op& element, const OpSetMetadata& m) {
+    auto cmp = m.key_cmp(element.key, this->key);
+    
+    if (cmp > 0) {
         return QueryResult{ QueryResult::FINISH, 0 };
     }
-    if (op.visible()) {
-        ops.push_back(&op);
-        ops_pos.push_back(pos);
+    else if (cmp == 0) {
+        if (element.visible()) {
+            ops.push_back(&element);
+            ops_pos.push_back(pos);
+        }
     }
+
     ++pos;
     return QueryResult{ QueryResult::NEXT, 0 };
 }

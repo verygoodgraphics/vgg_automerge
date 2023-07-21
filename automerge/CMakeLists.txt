@@ -64,7 +64,10 @@ add_library (automerge STATIC
 	"sync/Bloom.h"
 	"sync/Bloom.cpp"
 	"sync/State.cpp"
-	"Sync.cpp")
+	"Sync.cpp"
+	"StringCache.h"
+	"StringCache.cpp"
+)
 
 target_include_directories(automerge PUBLIC
 	${VGG_CONTRIB_JSON_INCLUDE}

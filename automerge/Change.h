@@ -17,17 +17,17 @@
 #include "legacy.h"
 
 const std::vector<u8> MAGIC_BYTES = { 0x85, 0x6f, 0x4a, 0x83 };
-const usize PREAMBLE_BYTES = 8;
-const usize HEADER_BYTES = PREAMBLE_BYTES + 1;
+constexpr usize PREAMBLE_BYTES = 8;
+constexpr usize HEADER_BYTES = PREAMBLE_BYTES + 1;
 
-const u8 BLOCK_TYPE_DOC = 0;
-const u8 BLOCK_TYPE_CHANGE = 1;
-const u8 BLOCK_TYPE_DEFLATE = 2;
-const usize CHUNK_START = 8;
-const Range HASH_RANGE = { 4, 8 };
+constexpr u8 BLOCK_TYPE_DOC = 0;
+constexpr u8 BLOCK_TYPE_CHANGE = 1;
+constexpr u8 BLOCK_TYPE_DEFLATE = 2;
+constexpr usize CHUNK_START = 8;
+constexpr Range HASH_RANGE = { 4, 8 };
 
 std::vector<u8> encode_document(std::vector<ChangeHash>&& heads, const std::vector<Change>& changes,
-    OpSetIter&& doc_ops, const IndexedCache<ActorId>& actors_index, const std::vector<std::string>& props);
+    OpSetIter&& doc_ops, const IndexedCache<ActorId>& actors_index, const std::vector<std::string_view>& props);
 
 struct ChangeBytes {
     bool isCompressed = false;
@@ -82,9 +82,8 @@ struct OldChange {
     // an operation) lexicographically ordered following the change author.
     std::vector<ActorId> actor_ids_in_change() const;
 
-    ChunkIntermediate encode_chunk(const std::vector<ChangeHash>& deps) const;
-
-    Change encode() const;
+    // note: consume operations
+    ChunkIntermediate encode_chunk(const std::vector<ChangeHash>& deps);
 };
 
 struct ChunkIntermediate {
@@ -132,6 +131,8 @@ struct Change {
         return decode_change(std::move(bytes));
     }
 
+    static Change from_old_change(OldChange&& change);
+
     bool is_empty() const {
         return len() == 0;
     }
@@ -170,7 +171,7 @@ static T read_slice(const BinSlice& bytes, Range& cursor) {
 
     std::optional<T> val;
     Decoding::decode(view, val);
-    if (!val) {
+    if (!val.has_value()) {
         throw std::runtime_error("no decoded value");
     }
 

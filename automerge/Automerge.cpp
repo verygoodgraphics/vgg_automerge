@@ -24,7 +24,7 @@ usize Automerge::get_actor_index() {
         return actor.cached;
     }
 
-    usize index = ops.m.actors.cache(std::move(actor.unused));
+    usize index = ops.m.cache_actor(std::move(actor.unused));
     actor.isUsed = true;
     actor.cached = index;
 
@@ -51,7 +51,7 @@ TransactionInner Automerge::transaction_inner() {
             }
         }
         if (!found) {
-            deps.push_back(last_hash);
+            deps.push_back(std::move(last_hash));
         }
     }
 
@@ -150,7 +150,7 @@ std::pair<ObjId, ObjType> Automerge::exid_to_obj(const ExId& id) const {
     }
     else {
         auto res = ops.m.actors.lookup(actor);
-        if (!res) {
+        if (!res.has_value()) {
             throw AutomergeError{ AutomergeError::Fail, (u64)0 };
         }
         obj = ObjId{ ctr, *res };
@@ -197,7 +197,7 @@ std::vector<ValuePair> Automerge::get_all(const ExId& obj, Prop&& prop) const {
     ObjId object = std::get<ObjId>(exid_to_obj(obj));
     if (prop.tag == Prop::Map) {
         auto prop_cached = this->ops.m.props.lookup(std::get<std::string>(prop.data));
-        if (!prop_cached) {
+        if (!prop_cached.has_value()) {
             return {};
         }
 
@@ -252,7 +252,7 @@ void Automerge::apply_changes_with(std::vector<Change>&& changes, OpObserver* op
 
     while (true) {
         auto c = pop_next_causally_ready_change();
-        if (!c) {
+        if (!c.has_value()) {
             break;
         }
 
@@ -285,8 +285,12 @@ std::optional<Change> Automerge::pop_next_causally_ready_change() {
     while (index < queue.size()) {
         if (is_causally_ready(queue[index])) {
             auto res = Change(std::move(queue[index]));
-            queue[index] = std::move(queue.back());
-            queue.pop_back();
+            if (index == queue.size() - 1) {
+                queue.pop_back();
+            }
+            else {
+                queue[index] = vector_pop(queue);
+            }
             return { std::move(res) };
         }
         ++index;
@@ -302,7 +306,7 @@ std::vector<std::pair<ObjId, Op>> Automerge::imports_ops(const Change& change) {
     usize i = 0;
     std::optional<OldOp> c;
     while ((c = op_iter.next())) {
-        usize actor = ops.m.actors.cache(ActorId(change.actor_id()));
+        usize actor = ops.m.cache_actor(ActorId(change.actor_id()));
         OpId id{ change.start_op + i, std::move(actor) };
 
         ObjId obj;
@@ -311,14 +315,14 @@ std::vector<std::pair<ObjId, Op>> Automerge::imports_ops(const Change& change) {
         }
         else {
             obj.counter = c->obj.id.counter;
-            obj.actor = ops.m.actors.cache(std::move(c->obj.id.actor));
+            obj.actor = ops.m.cache_actor(std::move(c->obj.id.actor));
         }
 
         auto pred = ops.m.import_opids(std::move(c->pred));
 
         Key key;
         if (c->key.tag == OldKey::MAP) {
-            key = Key{ Key::Map, ops.m.props.cache(std::get<std::string>(std::move(c->key.data))) };
+            key = Key{ Key::Map, ops.m.cache_prop(std::get<std::string_view>(std::move(c->key.data))) };
         }
         else {
             auto& elem_id = std::get<OldElementId>(c->key.data);
@@ -326,11 +330,11 @@ std::vector<std::pair<ObjId, Op>> Automerge::imports_ops(const Change& change) {
                 key = Key{ Key::Seq, HEAD };
             }
             else {
-                key = Key{ Key::Seq, ElemId{ elem_id.id.counter, ops.m.actors.cache(std::move(elem_id.id.actor)) } };
+                key = Key{ Key::Seq, ElemId{ elem_id.id.counter, ops.m.cache_actor(std::move(elem_id.id.actor)) } };
             }
         }
 
-        res.push_back({
+        res.emplace_back(
             std::move(obj),
             Op{
                 std::move(id),
@@ -339,7 +343,6 @@ std::vector<std::pair<ObjId, Op>> Automerge::imports_ops(const Change& change) {
                 {},
                 std::move(pred),
                 c->insert
-            }
             });
 
         ++i;
@@ -377,6 +380,7 @@ std::vector<u8> Automerge::save() {
 
 void Automerge::filter_changes(const std::vector<ChangeHash>& _heads, std::set<ChangeHash>& changes) const {
     std::vector<ChangeHash> heads;
+    heads.reserve(_heads.size());
     for (auto& hash : _heads) {
         if (histroy_index.count(hash)) {
             heads.push_back(hash);
@@ -410,9 +414,14 @@ std::vector<ChangeHash> Automerge::get_missing_deps(const std::vector<ChangeHash
     }
 
     std::vector<ChangeHash> missing_deps;
-    for (auto& hash : missing) {
-        if (!in_queue.count(hash)) {
-            missing_deps.push_back(hash);
+    missing_deps.reserve(missing.size());
+    for (auto iter = missing.begin(); iter != missing.end();) {
+        if (!in_queue.count(*iter)) {
+            // need iter++ as iter will be invalid after extract()
+            missing_deps.push_back(std::move(missing.extract(iter++).value()));
+        }
+        else {
+            ++iter;
         }
     }
     std::sort(missing_deps.begin(), missing_deps.end());
@@ -539,7 +548,7 @@ usize Automerge::update_history(Change&& change, usize num_pos) {
 
     usize histroy_index = histroy.size();
 
-    usize actor_index = ops.m.actors.cache(ActorId(change.actor_id()));
+    usize actor_index = ops.m.cache_actor(ActorId(change.actor_id()));
     states[actor_index].push_back(histroy_index);
 
     this->histroy_index.insert({ change.hash, histroy_index });
@@ -573,9 +582,9 @@ std::pair<ExId, ObjType> Automerge::import(const std::string_view& s) const {
         throw AutomergeError{ AutomergeError::InvalidObjIdFormat, std::string(s) };
     }
 
-    auto actor = ActorId(std::string(s.cbegin() + (n + 1), s.cend()));
+    auto actor = ActorId(std::string_view(s.data() + (n + 1), s.size() - (n + 1)));
     auto actor_index = ops.m.actors.lookup(actor);
-    if (!actor_index) {
+    if (!actor_index.has_value()) {
         throw AutomergeError{ AutomergeError::InvalidObjId, std::string(s) };
     }
 
@@ -617,7 +626,7 @@ std::string Automerge::to_string(Export&& id) const {
         return str;
     }
     case Export::Prop:
-        return ops.m.props[std::get<usize>(id.data)];
+        return std::string(ops.m.props[std::get<usize>(id.data)]);
     case Export::Special:
         return std::get<std::string>(id.data);
     default:
@@ -644,10 +653,10 @@ std::optional<SyncMessage> Automerge::generate_sync_message(State& sync_state) c
     if (std::all_of(our_need.cbegin(), our_need.cend(), [&](const ChangeHash& hash) {
         return their_heads_set.count(hash);
         })) {
-        our_have.push_back(make_bloom_filter(std::vector<ChangeHash>(sync_state.shared_heads)));
+        our_have.push_back(make_bloom_filter(std::vector(sync_state.shared_heads)));
     }
 
-    if (sync_state.their_have && !sync_state.their_have->empty()) {
+    if (sync_state.their_have.has_value() && !sync_state.their_have->empty()) {
         auto& last_sync = sync_state.their_have->front().last_sync;
         if (!std::all_of(last_sync.cbegin(), last_sync.cend(), [&](const ChangeHash& hash) {
             return get_change_by_hash(hash).has_value();
@@ -708,7 +717,7 @@ std::optional<SyncMessage> Automerge::generate_sync_message(State& sync_state) c
 void Automerge::receive_sync_message_with(State& sync_state, SyncMessage&& message, OpObserver* options) {
     auto before_heads = get_heads();
 
-    auto&& [message_heads, message_need, message_have, message_changes] = std::move(message);
+    auto& [message_heads, message_need, message_have, message_changes] = message;
 
     bool change_is_empty = message_changes.empty();
     if (!change_is_empty) {
@@ -733,6 +742,7 @@ void Automerge::receive_sync_message_with(State& sync_state, SyncMessage&& messa
     }
 
     std::vector<const ChangeHash*> known_heads;
+    known_heads.reserve(message_heads.size());
     for (auto& head : message_heads) {
         if (get_change_by_hash(head).has_value()) {
             known_heads.push_back(&head);
@@ -806,7 +816,12 @@ std::vector<const Change*> Automerge::get_changes_to_send(const std::vector<Have
         last_sync_hashes_set.insert(last_sync.cbegin(), last_sync.cend());
         bloom_filters.push_back(&bloom);
     }
-    std::vector<ChangeHash> last_sync_hashes(last_sync_hashes_set.cbegin(), last_sync_hashes_set.cend());
+
+    std::vector<ChangeHash> last_sync_hashes;
+    last_sync_hashes.reserve(last_sync_hashes_set.size());
+    for (auto iter = last_sync_hashes_set.begin(); iter != last_sync_hashes_set.end(); ) {
+        last_sync_hashes.push_back(std::move(last_sync_hashes_set.extract(iter++).value()));
+    }
 
     auto changes = get_changes(last_sync_hashes);
 
@@ -831,14 +846,13 @@ std::vector<const Change*> Automerge::get_changes_to_send(const std::vector<Have
 
     std::vector<ChangeHash> stack(hashes_to_send.cbegin(), hashes_to_send.cend());
     while (!stack.empty()) {
-        ChangeHash hash = std::move(stack.back());
-        stack.pop_back();
+        auto hash = vector_pop(stack);
 
         auto deps = dependents.find(hash);
         if (deps != dependents.end()) {
             for (auto& dep : deps->second) {
                 if (hashes_to_send.insert(dep).second) {
-                    stack.push_back(dep);
+                    stack.push_back(std::move(dep));
                 }
             }
         }
@@ -910,7 +924,7 @@ json map_to_json(const Automerge& doc, const ExId& obj) {
         std::optional<std::string> key;
         while ((key = keys.next())) {
             auto val = doc.get(obj, Prop(std::move(std::string(*key))));
-            if (!val) {
+            if (!val.has_value()) {
                 continue;
             }
             auto& value = val->second;
@@ -951,7 +965,7 @@ json list_to_json(const Automerge& doc, const ExId& obj) {
 
         for (usize i = 0; i < len; ++i) {
             auto val = doc.get(obj, Prop(i));
-            if (!val) {
+            if (!val.has_value()) {
                 continue;
             }
             auto& value = val->second;
@@ -1041,7 +1055,7 @@ JsonPathParsed Automerge::json_pointer_parse(ExId&& prefix_id, ObjType prefix_ty
 
     // return parsed result
     auto prop_pair = std::make_pair(std::move(parent_id), std::move(prop));
-    if (!item) {
+    if (!item.has_value()) {
         return JsonPathParsed{ JsonPathParsed::NewPath, std::move(prop_pair) };
     }
     else {
@@ -1105,7 +1119,7 @@ static auto json_to_object(const json& value, const std::optional<std::string>& 
         std::list<std::pair<Prop, json>> map;
 
         for (auto& [key, val] : obj) {
-            map.push_back({ Prop(std::string(key)), std::move(val) });
+            map.emplace_back(Prop(std::string(key)), std::move(val));
         }
 
         return std::make_pair(ObjType::Map, std::move(map));
@@ -1117,7 +1131,7 @@ static auto json_to_object(const json& value, const std::optional<std::string>& 
 
         for (usize i = 0; i < vec.size(); ++i) {
             // treat an Automerge list as a singly linked list, insert items from front in reverse order use O(N) time
-            list.push_back({ Prop(0), std::move(vec[vec.size() - i - 1]) });
+            list.emplace_back(Prop(0), std::move(vec[vec.size() - i - 1]));
         }
 
         return std::make_pair(ObjType::List, std::move(list));
@@ -1160,7 +1174,7 @@ static void json_to_transaction(const ExId& obj, std::list<std::pair<Prop, json>
         iter = vals.erase(iter);
 
         // invalid parent_value, ignore this key-parent_value
-        if (!parsed_value) {
+        if (!parsed_value.has_value()) {
             continue;
         }
 
@@ -1204,7 +1218,7 @@ Automerge json_to_automerge(const json& value) {
 
     // parse json ROOT
     auto parsed_value = json_to_value(value, {});
-    if (!parsed_value || (parsed_value->first.tag != Value::OBJECT) ||
+    if (!parsed_value.has_value() || (parsed_value->first.tag != Value::OBJECT) ||
         (std::get<ObjType>(parsed_value->first.data) != ObjType::Map)) {
         // Automerge json ROOT should be a map
         return doc;
@@ -1232,7 +1246,7 @@ ExId Automerge::put_object(const ExId& obj, Prop&& prop, const std::string& valu
 
         // parse json value
         auto parsed_value = json_to_value(value, {});
-        if (!parsed_value || parsed_value->first.tag != Value::OBJECT) {
+        if (!parsed_value.has_value() || parsed_value->first.tag != Value::OBJECT) {
             throw std::runtime_error("invalid json object[" + value_str + "]");
         }
 
@@ -1254,7 +1268,7 @@ ExId Automerge::insert_object(const ExId& obj, usize index, const std::string& v
 
         // parse json value
         auto parsed_value = json_to_value(value, {});
-        if (!parsed_value || parsed_value->first.tag != Value::OBJECT) {
+        if (!parsed_value.has_value() || parsed_value->first.tag != Value::OBJECT) {
             throw std::runtime_error("invalid json object[" + value_str + "]");
         }
 
@@ -1277,7 +1291,7 @@ void Automerge::json_add(const json::json_pointer& path, const json& value) {
 
     // parse json value
     auto parsed_value = json_to_value(value, {});
-    if (!parsed_value) {
+    if (!parsed_value.has_value()) {
         throw std::runtime_error("invalid json value[" + value.dump() + "]");
     }
 
@@ -1362,7 +1376,7 @@ ExId Automerge::json_adding(const PropPair& item, std::pair<Value, std::list<std
 void Automerge::json_replace(const json::json_pointer& path, const json& value) {
     // parse json value
     auto parsed_value = json_to_value(value, {});
-    if (!parsed_value) {
+    if (!parsed_value.has_value()) {
         throw std::runtime_error("invalid json value[" + value.dump() + "]");
     }
 
@@ -1455,7 +1469,7 @@ std::pair<ExId, ObjType> Automerge::import_path(
     ExId&& prefix_id, ObjType prefix_type, const std::string_view& obj_path
 ) const {
     try {
-        auto&& json_path = (obj_path == "/") ? json::json_pointer() : json::json_pointer(std::string(obj_path));
+        json::json_pointer json_path = (obj_path == "/") ? json::json_pointer() : json::json_pointer(std::string(obj_path));
         auto item = json_pointer_parse(std::move(prefix_id), prefix_type, json_path);
         if (item.tag != JsonPathParsed::ExistedPath) {
             throw;

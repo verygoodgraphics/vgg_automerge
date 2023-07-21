@@ -3,7 +3,7 @@
 
 #include "legacy.h"
 
-OldOp::OldOp(const Op& op, const ObjId& obj, const IndexedCache<ActorId>& actors, const IndexedCache<std::string>& props) {
+OldOp::OldOp(const Op& op, const ObjId& obj, const IndexedCache<ActorId>& actors, const IndexedCache<std::string_view>& props) {
     this->action = op.action;
 
     this->obj = OldObjectId(obj, actors);
@@ -15,8 +15,9 @@ OldOp::OldOp(const Op& op, const ObjId& obj, const IndexedCache<ActorId>& actors
         this->key = OldKey{ OldKey::SEQ, OldElementId(std::get<ElemId>(op.key.data), actors) };
     }
 
+    this->pred.reserve(op.pred.v.size());
     for (auto& id : op.pred.v) {
-        this->pred.push_back(OldOpId(id, actors));
+        this->pred.emplace_back(id, actors);
     }
     std::sort(this->pred.begin(), this->pred.end());
 

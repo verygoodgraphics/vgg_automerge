@@ -55,7 +55,11 @@ public:
 
     static void decode(BinSlice& bytes, std::optional<std::string>& val);
 
+    static void decode(BinSlice& bytes, std::optional<std::string_view>& val);
+
     static void decode(BinSlice& bytes, std::optional<std::optional<std::string>>& val);
+
+    static void decode(BinSlice& bytes, std::optional<std::optional<std::string_view>>& val);
 
     static void decode(BinSlice& bytes, std::optional<ActorId>& val);
 
@@ -102,7 +106,7 @@ public:
 
         std::optional<T> res;
         Decoding::decode(buf, res);
-        if (!res) {
+        if (!res.has_value()) {
             //throw std::runtime_error("NoDecodedValue");
             return {};
         }
@@ -142,8 +146,8 @@ private:
 
 struct BooleanDecoder {
     Decoder decoder;
-    bool last_value;
-    usize count;
+    bool last_value = false;
+    usize count = 0;
 
     BooleanDecoder() = default;
     BooleanDecoder(std::vector<u8>&& data) : decoder(std::move(data)), last_value(true), count(0) {}
@@ -170,7 +174,7 @@ struct RleDecoder {
             }
 
             auto res = decoder.read<s64>();
-            if (!res) {
+            if (!res.has_value()) {
                 // warning
                 return {};
             }
@@ -205,7 +209,7 @@ struct RleDecoder {
 
 struct DeltaDecoder {
     RleDecoder<s64> rle;
-    u64 absolute_val;
+    u64 absolute_val = 0;
 
     DeltaDecoder() = default;
     DeltaDecoder(std::vector<u8>&& bytes) : rle(std::move(bytes)), absolute_val(0) {}

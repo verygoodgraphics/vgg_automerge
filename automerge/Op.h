@@ -125,5 +125,5 @@ struct Op {
     Value value() const;
 };
 
-typedef std::function<void(Op&)> OpFunc;
-typedef std::function<int(const Op*)> OpCmpFunc;
+using OpFunc = std::function<void(Op&)>;
+using OpCmpFunc = std::function<int(const Op*)>;

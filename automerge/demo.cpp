@@ -266,6 +266,86 @@ void hex_string_test() {
     assert(binary == bin_vec);
 }
 
+static Automerge repeated_put(u64 n) {
+    Automerge doc;
+    for (u64 i = 0; i < n; ++i) {
+        doc.put(ExId(), Prop("0"), ScalarValue{ ScalarValue::Uint, i });
+    }
+    doc.commit();
+
+    return doc;
+}
+
+static Automerge repeated_increment(u64 n) {
+    Automerge doc;
+    doc.put(ExId(), Prop("counter"), ScalarValue{ ScalarValue::Counter, Counter() });
+    for (u64 i = 0; i < n; ++i) {
+        doc.increment(ExId(), Prop("counter"), 1);
+    }
+    doc.commit();
+
+    return doc;
+}
+
+static Automerge decreasing_put(u64 n) {
+    Automerge doc;
+    for (u64 i = n; i > 0; --i) {
+        doc.put(ExId(), Prop(std::to_string(i)), ScalarValue{ ScalarValue::Uint, i });
+    }
+    doc.commit();
+
+    return doc;
+}
+
+static void map_repeated_put() {
+    for (int i = 0; i < 100; ++i) {
+        repeated_put(10000);
+    }
+}
+
+static void map_repeated_increment() {
+    for (int i = 0; i < 100; ++i) {
+        repeated_increment(10000);
+    }
+}
+
+static void map_decreasing_put() {
+    for (int i = 0; i < 1000; ++i) {
+        decreasing_put(10000);
+    }
+}
+
+static void map_save_decreasing_put() {
+    auto doc = decreasing_put(100);
+
+    for (int i = 0; i < 100000; ++i) {
+        doc.save();
+    }
+}
+
+static void map_load_repeated_put() {
+    auto bytes = repeated_put(10000).save();
+    for (int i = 0; i < 100; ++i) {
+        Automerge::load(make_bin_slice(bytes));
+    }
+}
+
+static void map_load_decreasing_put() {
+    auto bytes = decreasing_put(10000).save();
+
+    for (int i = 0; i < 100; ++i) {
+        Automerge::load(make_bin_slice(bytes));
+    }
+}
+
+void vector_string() {
+    std::vector<std::string> vs;
+
+    for (int i = 0; i < 10000; ++i) {
+        vs.push_back(std::to_string(i));
+    }
+}
+
 int main()
 {
     std::cout << "demo\n";
@@ -281,6 +361,20 @@ int main()
     hex_string_test();
 
     std::cout << "passed" << std::endl;
+
+    //map_repeated_put();
+
+    //map_repeated_increment();
+
+    //map_decreasing_put();
+
+    //map_save_decreasing_put();
+
+    //map_load_repeated_put();
+
+    //map_load_decreasing_put();
+
+    //vector_string();
 
     return 0;
 }

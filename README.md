@@ -7,10 +7,7 @@ Some components are under working listed as below:
 - text data type
 - history related APIs
 - OpObserver
-- sync methods
 - exceptions
-- test cases
-- benchmark
 
 ## Advantage
 
@@ -68,17 +65,13 @@ assert(json(automerge_doc) == json::parse(R"({
 ## Usage
 
 - list
-
   `cmake --list-presets=all .`
 
 - configure
-
   `cmake --preset <configurePreset>`, where `<configurePreset>` is the name of the active Configure Preset.
 
 - build
-
   `cmake --build out/build/<configurePreset>`
-
   or `cmake --build --preset <buildPreset>`, where `<buildPreset>` is the name of the active Build Preset.
 
 ## Thanks

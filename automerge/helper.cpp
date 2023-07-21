@@ -58,9 +58,9 @@ std::vector<u8> deflate_compress(const BinSlice& data) {
 }
 
 std::vector<u8> deflate_decompress(const BinSlice& data) {
-    u8* decomp = new u8[data.second * 200]();
+    u8* decomp = new u8[data.second * 128]();
 
-    int n = sinflate(decomp, (int)data.second * 200, &(*data.first), (int)data.second);
+    int n = sinflate(decomp, (int)data.second * 128, &(*data.first), (int)data.second);
     std::vector<u8> res(std::make_move_iterator(decomp), std::make_move_iterator(decomp + n));
 
     delete[]decomp;
@@ -95,7 +95,7 @@ static u8 hex_value(u8 hex_digit) {
     return (u8)value;
 }
 
-std::vector<u8> hex_from_string(const std::string& hex_str) {
+std::vector<u8> hex_from_string(const std::string_view& hex_str) {
     std::vector<u8> bytes;
     usize len = hex_str.length();
 

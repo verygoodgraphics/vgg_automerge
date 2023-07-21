@@ -19,7 +19,7 @@ std::optional<State> State::decode(const BinSlice& bytes) {
     Decoder decoder(bytes);
 
     auto record_type = decoder.read<u8>();
-    if (!record_type) {
+    if (!record_type.has_value()) {
         return {};
     }
     if (*record_type != SYNC_STATE_TYPE) {
@@ -28,7 +28,7 @@ std::optional<State> State::decode(const BinSlice& bytes) {
     }
 
     auto shared_heads = decode_hashes(decoder);
-    if (!shared_heads) {
+    if (!shared_heads.has_value()) {
         return {};
     }
 
@@ -45,7 +45,7 @@ std::optional<State> State::decode(const BinSlice& bytes) {
 
 std::optional<std::vector<ChangeHash>> decode_hashes(Decoder& decoder) {
     std::optional<u64> len = decoder.read<u64>();
-    if (!len) {
+    if (!len.has_value()) {
         return {};
     }
 
@@ -58,11 +58,11 @@ std::optional<std::vector<ChangeHash>> decode_hashes(Decoder& decoder) {
     try {
         for (int i = 0; i < *len; ++i) {
             auto hash_bytes = decoder.read_bytes(HASH_SIZE);
-            if (!hash_bytes) {
+            if (!hash_bytes.has_value()) {
                 return {};
             }
             
-            hashes.push_back(ChangeHash(*hash_bytes));
+            hashes.emplace_back(*hash_bytes);
         }
     }
     catch (std::exception) {

@@ -75,7 +75,7 @@ struct OldKey {
         MAP,
         SEQ
     } tag = MAP;
-    std::variant<std::string, OldElementId> data = {};
+    std::variant<std::string_view, OldElementId> data = {};
 
     static OldKey head() {
         return { SEQ, OldElementId(true) };
@@ -113,7 +113,7 @@ struct OldOp {
     OldOp() = default;
     OldOp(OpType&& action, OldObjectId&& obj, OldKey&& key, std::vector<OldOpId>&& pred, bool insert)
         : action(std::move(action)), obj(std::move(obj)), key(std::move(key)), pred(std::move(pred)), insert(insert) {}
-    OldOp(const Op& op, const ObjId& obj, const IndexedCache<ActorId>& actors, const IndexedCache<std::string>& props);
+    OldOp(const Op& op, const ObjId& obj, const IndexedCache<ActorId>& actors, const IndexedCache<std::string_view>& props);
 
     bool operator==(const OldOp& other) const;
 

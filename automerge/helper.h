@@ -7,6 +7,7 @@
 #include <iterator>
 #include <algorithm> 
 #include <cassert>
+#include <string_view>
 
 #include "type.h"
 
@@ -101,4 +102,4 @@ std::string hex_to_string(const std::pair<T, usize>& hex_bytes) {
     return str;
 }
 
-std::vector<u8> hex_from_string(const std::string& hex_str);
+std::vector<u8> hex_from_string(const std::string_view& hex_str);

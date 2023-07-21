@@ -2,13 +2,15 @@
 // This code is licensed under MIT license (see LICENSE for details)
 
 #pragma once
+
 #include <optional>
 #include <type_traits>
 
 #include "type.h"
 
-const usize DEFLATE_MIN_SIZE = 256;
-const u32 COLUMN_TYPE_DEFLATE = 8;
+constexpr usize DEFLATE_MIN_SIZE = 256;
+constexpr u32 COLUMN_TYPE_DEFLATE = 8;
+constexpr usize LEB128_U64_MAX_BYTE_SIZE = 10;
 
 class Encoder {
 public:
@@ -48,7 +50,18 @@ public:
 
     usize encode(const std::string& val);
 
+    usize encode(const std::string_view& val);
+
     usize encode(const std::optional<std::string>& val) {
+        if (val) {
+            return encode(*val);
+        }
+        else {
+            return encode((u64)0);
+        }
+    }
+
+    usize encode(const std::optional<std::string_view>& val) {
         if (val) {
             return encode(*val);
         }
@@ -118,22 +131,21 @@ struct RleEncoder {
     Encoder encoder = Encoder(buf);
 
     ColData finish(u32 col) {
-        RleState<T> old_state = take_state();
-        switch (old_state.tag) {
+        switch (state.tag) {
         case RleState<T>::NULL_RUN:
             if (!buf.empty()) {
-                flush_null_run(old_state.size);
+                flush_null_run(state.size);
             }
             break;
         case RleState<T>::LONE_VAL:
-            flush_lit_run({ std::move(old_state.value) });
+            flush_lit_run({ std::move(state.value) });
             break;
         case RleState<T>::RUN:
-            flush_run(old_state.value, old_state.size);
+            flush_run(state.value, state.size);
             break;
         case RleState<T>::LITERAL_RUN:
-            old_state.vec_value.push_back(std::move(old_state.value));
-            flush_lit_run(std::move(old_state.vec_value));
+            state.vec_value.push_back(std::move(state.value));
+            flush_lit_run(std::move(state.vec_value));
             break;
         case RleState<T>::EMPTY:
             break;
@@ -156,38 +168,30 @@ struct RleEncoder {
 
     void flush_lit_run(std::vector<T>&& run) {
         encoder.encode(-((s64)run.size()));
-        for (auto& val : run) {
+        for (const auto& val : run) {
             encoder.encode(val);
         }
     }
 
-    RleState<T> take_state() {
-        RleState<T> state;
-        std::swap(this->state, state);
-        return state;
-    }
-
     void append_null() {
-        RleState<T> old_state = take_state();
-        switch (old_state.tag) {
+        switch (state.tag) {
         case RleState<T>::EMPTY:
             state = RleState<T>{ RleState<T>::NULL_RUN, 1, {}, {} };
             break;
         case RleState<T>::NULL_RUN:
-            old_state.size += 1;
-            state = old_state;
+            state.size += 1;
             break;
         case RleState<T>::LONE_VAL:
-            flush_lit_run({ std::move(old_state.value) });
+            flush_lit_run({ std::move(state.value) });
             state = RleState<T>{ RleState<T>::NULL_RUN, 1, {}, {} };
             break;
         case RleState<T>::RUN:
-            flush_run(old_state.value, old_state.size);
+            flush_run(state.value, state.size);
             state = RleState<T>{ RleState<T>::NULL_RUN, 1, {}, {} };
             break;
         case RleState<T>::LITERAL_RUN:
-            old_state.vec_value.push_back(std::move(old_state.value));
-            flush_lit_run(std::move(old_state.vec_value));
+            state.vec_value.push_back(std::move(state.value));
+            flush_lit_run(std::move(state.vec_value));
             state = RleState<T>{ RleState<T>::NULL_RUN, 1, {}, {} };
             break;
         default:
@@ -196,45 +200,41 @@ struct RleEncoder {
     }
 
     void append_value(T&& value) {
-        RleState<T> old_state = take_state();
-        switch (old_state.tag) {
+        switch (state.tag) {
         case RleState<T>::EMPTY:
             state = RleState<T>{ RleState<T>::LONE_VAL, 0, std::move(value), {} };
             break;
         case RleState<T>::LONE_VAL:
-            if (old_state.value == value) {
+            if (state.value == value) {
                 state = RleState<T>{ RleState<T>::RUN, 2, std::move(value), {} };
             }
             else {
                 std::vector<T> v;
-                v.reserve(2);
-                v.push_back(std::move(old_state.value));
+                v.push_back(std::move(state.value));
                 state = RleState<T>{ RleState<T>::LITERAL_RUN, 0, std::move(value), std::move(v) };
             }
             break;
         case RleState<T>::RUN:
-            if (old_state.value == value) {
-                old_state.size += 1;
-                state = old_state;
+            if (state.value == value) {
+                state.size += 1;
             }
             else {
-                flush_run(old_state.value, old_state.size);
+                flush_run(state.value, state.size);
                 state = RleState<T>{ RleState<T>::LONE_VAL, 0, std::move(value), {} };
             }
             break;
         case RleState<T>::LITERAL_RUN:
-            if (old_state.value == value) {
-                flush_lit_run(std::move(old_state.vec_value));
+            if (state.value == value) {
+                flush_lit_run(std::move(state.vec_value));
                 state = RleState<T>{ RleState<T>::RUN, 2, std::move(value), {} };
             }
             else {
-                old_state.vec_value.push_back(std::move(old_state.value));
-                old_state.value = std::move(value);
-                state = old_state;
+                state.vec_value.push_back(std::move(state.value));
+                state.value = std::move(value);
             }
             break;
         case RleState<T>::NULL_RUN:
-            flush_null_run(old_state.size);
+            flush_null_run(state.size);
             state = RleState<T>{ RleState<T>::LONE_VAL, 0, std::move(value), {} };
             break;
         default:

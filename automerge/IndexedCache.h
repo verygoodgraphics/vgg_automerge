@@ -18,6 +18,7 @@ template <class T>
 class IndexedCache {
 public:
     std::vector<T> _cache;
+    std::unordered_map<T, usize> _lookup;
 
     IndexedCache() = default;
     IndexedCache(const IndexedCache&) = default;
@@ -38,8 +39,6 @@ public:
         return _cache[index];
     }
 
-    usize cache(T&& item);
-
     std::optional<usize> lookup(const T& item) const;
 
     usize len() const {
@@ -59,7 +58,9 @@ public:
     void print() const;
 
 private:
-    std::unordered_map<T, usize> _lookup;
+    usize cache(T&& item);
+
+    friend struct OpSetMetadata;
 };
 
 template <class T>
@@ -70,8 +71,8 @@ usize IndexedCache<T>::cache(T&& item) {
     }
 
     usize n = _cache.size();
-    _cache.push_back(item);
-    _lookup.insert({ std::move(item), n });
+    _lookup.emplace(item, n);
+    _cache.push_back(std::move(item));
 
     return n;
 }
@@ -107,6 +108,7 @@ std::vector<usize> IndexedCache<T>::encode_index() const {
     std::sort(sorted_vec.begin(), sorted_vec.end());
 
     std::vector<usize> res;
+    res.reserve(sorted_vec.size());
     for (auto& t : this->_cache) {
         res.push_back(std::lower_bound(sorted_vec.begin(), sorted_vec.end(), t) - sorted_vec.begin());
     }

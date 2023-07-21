@@ -24,5 +24,5 @@ struct QueryProp : public TreeQuery {
 
     QueryResult query_node_with_metadata(const OpTreeNode& child, const OpSetMetadata& m);
 
-    QueryResult query_element(const Op& op);
+    QueryResult query_element_with_metadata(const Op& element, const OpSetMetadata& m);
 };

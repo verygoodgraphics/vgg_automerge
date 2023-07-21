@@ -10,9 +10,15 @@ add_subdirectory ("vgg_contrib/picosha2")
 add_subdirectory ("vgg_contrib/sdefl")
 add_subdirectory ("automerge")
 
-# add test targets
-include(CTest)
-if (BUILD_TESTING)
-    enable_testing()
-    add_subdirectory("test")
+if (EMSCRIPTEN)
+else()
+    # add test targets
+    include(CTest)
+    if (BUILD_TESTING)
+        enable_testing()
+        add_subdirectory("test")
+    endif()
+    
+    # add benchmark test
+    add_subdirectory("benchmark")
 endif()

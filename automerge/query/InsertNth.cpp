@@ -16,7 +16,7 @@ Key InsertNth::key() const {
 QueryResult InsertNth::query_node(const OpTreeNode& child) {
     // if this node has some visible elements then we may find our target within
     usize num_vis = child.index.visible_len();
-    if (last_seen && child.index.has_visible(*last_seen)) {
+    if (last_seen.has_value() && child.index.has_visible(*last_seen)) {
         --num_vis;
     }
 
@@ -39,7 +39,7 @@ QueryResult InsertNth::query_node(const OpTreeNode& child) {
     if (child.index.has_visible(last_elemid)) {
         last_seen = last_elemid;
     }
-    else if (last_seen && !(last_elemid == *last_seen)) {
+    else if (last_seen.has_value() && !(last_elemid == *last_seen)) {
         last_seen.reset();
     }
 
@@ -48,14 +48,14 @@ QueryResult InsertNth::query_node(const OpTreeNode& child) {
 
 QueryResult InsertNth::query_element(const Op& element) {
     if (element.insert) {
-        if (!valid && (seen >= target)) {
+        if (!valid.has_value() && (seen >= target)) {
             valid = n;
         }
         last_seen.reset();
         last_insert = element.elemid();
     }
 
-    if (!last_seen && element.visible()) {
+    if (!last_seen.has_value() && element.visible()) {
         if (seen >= target) {
             return QueryResult{ QueryResult::FINISH, 0 };
         }
