@@ -10,8 +10,7 @@ FetchContent_Declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
-add_executable(unit_test
-	"hello_test.cpp"
+add_executable(unit_test	
 	"automerge_test.cpp"
 )
 target_link_libraries(unit_test PRIVATE

@@ -1,3 +1,6 @@
+// Copyright (c) 2022 the VGG Automerge contributors
+// This code is licensed under MIT license (see LICENSE for details)
+
 #include <gtest/gtest.h>
 #include <iostream>
 #include <fstream>

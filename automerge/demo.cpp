@@ -348,19 +348,19 @@ void vector_string() {
 
 int main()
 {
-    //std::cout << "demo\n";
+    std::cout << "demo\n";
 
-    //auto doc = quickstart();
+    auto doc = quickstart();
 
-    //direct_edit_test();
+    direct_edit_test();
 
-    //json_demo();
+    json_demo();
 
-    //json_test(doc);
+    json_test(doc);
 
-    //hex_string_test();
+    hex_string_test();
 
-    //std::cout << "passed" << std::endl;
+    std::cout << "passed" << std::endl;
 
     //map_repeated_put();
 
@@ -370,7 +370,7 @@ int main()
 
     //map_save_decreasing_put();
 
-    map_load_repeated_put();
+    //map_load_repeated_put();
 
     //map_load_decreasing_put();
 

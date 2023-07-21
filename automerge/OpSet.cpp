@@ -226,7 +226,6 @@ void OpSetInternal::insert_op_with_observer(const ObjId& obj, Op&& op, OpObserve
     Prop key;
     if (op.key.tag == Key::Map) {
         key.tag = Prop::Map;
-        // TODO: string_view
         key.data = std::string(m.props[std::get<usize>(op.key.data)]);
     }
     else {
