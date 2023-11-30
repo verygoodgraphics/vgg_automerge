@@ -123,7 +123,7 @@ std::optional<QueryKeys> OpSetInternal::keys(const ObjId& obj) const {
         auto& tree = trees.at(obj);
         return tree.internal.keys();
     }
-    catch (std::out_of_range) {
+    catch (std::out_of_range&) {
         return std::nullopt;
     }
 }
@@ -133,7 +133,7 @@ TreeQuery& OpSetInternal::search(const ObjId& obj, TreeQuery& query) const {
         auto& tree = trees.at(obj);
         return tree.internal.search(query, m);
     }
-    catch (std::out_of_range) {
+    catch (std::out_of_range&) {
         return query;
     }
 }
@@ -143,7 +143,7 @@ void OpSetInternal::replace(const ObjId& obj, usize index, OpFunc f) {
         auto& tree = trees.at(obj);
         tree.internal.update(index, f);
     }
-    catch (std::out_of_range) {
+    catch (std::out_of_range&) {
     }
 }
 
@@ -158,7 +158,7 @@ void OpSetInternal::add_succ(const ObjId& obj, const std::vector<usize>& op_indi
                 });
         }
     }
-    catch (std::out_of_range) {
+    catch (std::out_of_range&) {
     }
 }
 
@@ -190,7 +190,7 @@ void OpSetInternal::insert(usize index, const ObjId& obj, Op&& element) {
         tree.internal.insert(index, std::move(element));
         ++length;
     }
-    catch (std::out_of_range) {
+    catch (std::out_of_range&) {
         // throw tracing::warn!("attempting to insert op for unknown object");
     }
 }
@@ -301,7 +301,7 @@ std::optional<ObjType> OpSetInternal::object_type(const ObjId& id) const {
         auto& tree = trees.at(id);
         return std::optional<ObjType>(tree.objtype);
     }
-    catch (std::out_of_range) {
+    catch (std::out_of_range&) {
         return std::nullopt;
     }
 }

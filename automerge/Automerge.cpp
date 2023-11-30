@@ -38,7 +38,7 @@ TransactionInner Automerge::transaction_inner() {
         auto& state = states.at(actor);
         seq = state.size() + 1;
     }
-    catch (std::out_of_range) {
+    catch (std::out_of_range&) {
         seq = 1;
     }
     auto deps = get_heads();
@@ -82,7 +82,7 @@ Keys Automerge::keys(const ExId& obj) const {
         auto [object, _] = exid_to_obj(obj);
         return Keys(this, ops.keys(object));
     }
-    catch (std::exception) {
+    catch (std::exception&) {
         return Keys(this, std::nullopt);
     }
 }
@@ -104,7 +104,7 @@ usize Automerge::length(const ExId& obj) const {
                 return 0;
         }
     }
-    catch (std::exception) {
+    catch (std::exception&) {
         return 0;
     }
 }
@@ -127,7 +127,7 @@ usize Automerge::length_at(const ExId& obj, const std::vector<ChangeHash>& heads
                 break;
         }
     }
-    catch (std::exception) {
+    catch (std::exception&) {
         return 0;
     }
 
@@ -482,7 +482,7 @@ std::optional<const Change*> Automerge::get_change_by_hash(const ChangeHash& has
         auto& change = histroy.at(index);
         return { &change };
     }
-    catch (std::out_of_range) {
+    catch (std::out_of_range&) {
         return {};
     }
 }
@@ -536,7 +536,7 @@ ChangeHash Automerge::get_hash(usize actor, u64 seq) const {
         auto& change = histroy.at(index);
         return change.hash;
     }
-    catch (std::out_of_range) {
+    catch (std::out_of_range&) {
         throw AutomergeError{ AutomergeError::InvalidSeq, seq };
     }
 }
@@ -923,7 +923,7 @@ json map_to_json(const Automerge& doc, const ExId& obj) {
 
         std::optional<std::string> key;
         while ((key = keys.next())) {
-            auto val = doc.get(obj, Prop(std::move(std::string(*key))));
+            auto val = doc.get(obj, Prop(std::string(*key)));
             if (!val.has_value()) {
                 continue;
             }
@@ -953,7 +953,7 @@ json map_to_json(const Automerge& doc, const ExId& obj) {
 
         return map;
     }
-    catch (std::exception) {
+    catch (std::exception&) {
         return json();
     }
 }
@@ -994,7 +994,7 @@ json list_to_json(const Automerge& doc, const ExId& obj) {
 
         return list;
     }
-    catch (std::exception) {
+    catch (std::exception&) {
         return json();
     }
 }
@@ -1040,7 +1040,7 @@ JsonPathParsed Automerge::json_pointer_parse(ExId&& prefix_id, ObjType prefix_ty
         try {
             prop = Prop(std::stol(path.back()));
         }
-        catch (std::exception) {
+        catch (std::exception&) {
             // err: "not a path of an array"
             return JsonPathParsed{ JsonPathParsed::Invalid, path.to_string() };
         }
@@ -1065,6 +1065,7 @@ JsonPathParsed Automerge::json_pointer_parse(ExId&& prefix_id, ObjType prefix_ty
 }
 
 // interop.rs: import_prop. not used now
+/*
 static std::optional<Prop> json_to_prop(const json& p) {
     if (p.is_string()) {
         return Prop(p.get<std::string>());
@@ -1077,6 +1078,7 @@ static std::optional<Prop> json_to_prop(const json& p) {
     // err: "prop must me a string or number"
     return {};
 }
+*/
 
 // interop.rs: import_scalar
 static std::optional<ScalarValue> json_to_scalar(const json& value, const std::optional<std::string>& datatype) {
@@ -1460,7 +1462,7 @@ void Automerge::json_delete(const json::json_pointer& path) {
             parent_ref.erase(key);
         }
     }
-    catch (std::exception) {
+    catch (std::exception&) {
         throw std::runtime_error("invalid path: " + path.to_string());
     }
 }

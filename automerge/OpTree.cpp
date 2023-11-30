@@ -259,14 +259,18 @@ void OpTreeNode::insert_into_non_full_node(usize index, Op&& element) {
 }
 
 void OpTreeNode::split_child(usize full_child_index) {
+#ifndef NDEBUG
     usize original_len_self = len();
+#endif
     auto& full_child = children[full_child_index];
 
     // Create a new node which is going to store (B-1) keys
     // of the full child.
     OpTreeNode successor_sibling;
-
+    
+#ifndef NDEBUG
     usize original_len = full_child.len();
+#endif
     assert(full_child.is_full());
 
     successor_sibling.elements = vector_split_off(full_child.elements, B);
@@ -285,8 +289,10 @@ void OpTreeNode::split_child(usize full_child_index) {
     full_child.length = full_child.elements.size() + children_len_sum(full_child);
     successor_sibling.length = successor_sibling.elements.size() + children_len_sum(successor_sibling);
 
+#ifndef NDEBUG
     usize z_len = successor_sibling.len();
     usize full_child_len = full_child.len();
+#endif
     full_child.reindex();
     successor_sibling.reindex();
 
@@ -435,7 +441,9 @@ usize OpTreeNode::check() const {
 }
 
 Op OpTreeNode::remove(usize index) {
+#ifndef NDEBUG
     usize original_len = len();
+#endif
 
     if (is_leaf()) {
         Op v = remove_from_leaf(index);
@@ -508,7 +516,6 @@ ReplaceArgs OpTreeNode::update(usize index, OpFunc f) {
     }
 
     usize cumulative_len = 0;
-    usize len = this->len();
     for (usize child_index = 0; child_index < children.size(); ++child_index) {
         auto& child = children[child_index];
         usize tmp_len = cumulative_len + child.len();
@@ -588,7 +595,9 @@ TreeQuery& OpTreeInternal::search(TreeQuery& query, const OpSetMetadata& m) cons
 void OpTreeInternal::insert(usize index, Op&& element) {
     assert(index <= len());
 
+#ifndef NDEBUG
     usize old_len = len();
+#endif
     if (!root_node.has_value()) {
         OpTreeNode root;
         root.insert_into_non_full_node(index, std::move(element));
@@ -608,7 +617,9 @@ void OpTreeInternal::insert(usize index, Op&& element) {
         return;
     }
 
+#ifndef NDEBUG
     usize original_len = root_node->len();
+#endif
     OpTreeNode old_root;
 
     // move a new root to root position

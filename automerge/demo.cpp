@@ -362,19 +362,19 @@ int main()
 
     std::cout << "passed" << std::endl;
 
-    //map_repeated_put();
+    map_repeated_put();
 
-    //map_repeated_increment();
+    map_repeated_increment();
 
-    //map_decreasing_put();
+    map_decreasing_put();
 
-    //map_save_decreasing_put();
+    map_save_decreasing_put();
 
-    //map_load_repeated_put();
+    map_load_repeated_put();
 
-    //map_load_decreasing_put();
+    map_load_decreasing_put();
 
-    //vector_string();
+    vector_string();
 
     return 0;
 }

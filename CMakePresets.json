@@ -86,6 +86,14 @@
       }
     },
     {
+      "name": "linux-release",
+      "displayName": "Linux Release",
+      "inherits": "linux-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
       "name": "linux-clang-debug",
       "displayName": "Linux Clang Debug",
       "generator": "Ninja",

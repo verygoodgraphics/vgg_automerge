@@ -56,7 +56,7 @@ std::optional<std::vector<ChangeHash>> decode_hashes(Decoder& decoder) {
     hashes.reserve(*len);
 
     try {
-        for (int i = 0; i < *len; ++i) {
+        for (u64 i = 0; i < *len; ++i) {
             auto hash_bytes = decoder.read_bytes(HASH_SIZE);
             if (!hash_bytes.has_value()) {
                 return {};
@@ -65,7 +65,7 @@ std::optional<std::vector<ChangeHash>> decode_hashes(Decoder& decoder) {
             hashes.emplace_back(*hash_bytes);
         }
     }
-    catch (std::exception) {
+    catch (std::exception&) {
         return {};
     }
 
