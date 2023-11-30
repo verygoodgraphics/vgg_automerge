@@ -366,3 +366,5 @@ FodyWeavers.xsd
 /docs/site
 
 /testEnvironments.json
+
+build*

@@ -3,6 +3,7 @@
 project ("vgg_automerge")
 
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror")
 
 # sub-project
 add_subdirectory ("vgg_contrib/json")
@@ -18,7 +19,7 @@ else()
         enable_testing()
         add_subdirectory("test")
     endif()
-    
+
     # add benchmark test
     add_subdirectory("benchmark")
 endif()
