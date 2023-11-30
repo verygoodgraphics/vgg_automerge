@@ -11,6 +11,52 @@
 #include "helper.h"
 #include "picosha2.h"
 
+// throw exception
+static Range read_leb128(BinSlice& bytes);
+
+// throw exception
+static Range slice_bytes(const BinSlice& bytes, Range& cursor);
+
+// throw exception
+static ChangeBytes decompress_chunk(Range&& preamble, Range&& body, std::vector<u8>&& compressed);
+
+// throw exception
+static std::vector<ChangeHash> decode_hashes(const BinSlice& bytes, Range& cursor);
+
+// throw exception
+static std::vector<ActorId> decode_actors(const BinSlice& bytes, Range& cursor, std::optional<ActorId>&& first);
+
+// throw exception
+static std::vector<std::pair<u32, usize>> decode_column_info(const BinSlice& bytes, Range& cursor, bool allow_compressed_column);
+
+static std::unordered_map<u32, Range> decode_columns(Range& cursor, const std::vector<std::pair<u32, usize>>& columns);
+
+// throw exception
+static std::tuple<u8, ChangeHash, Range> decode_header(const BinSlice& bytes);
+
+// throw exception
+static std::pair<u8, Range> decode_header_without_hash(const BinSlice& bytes);
+
+// throw exception
+static std::vector<Change> load_blocks(const BinSlice& bytes);
+
+// throw exception
+static std::vector<BinSlice> split_blocks(const BinSlice& bytes);
+
+// throw exception
+static std::optional<Range> pop_block(const BinSlice& bytes);
+
+// throw exception
+static void decode_block(const BinSlice& bytes, std::vector<Change>& changes);
+
+// throw exception
+static std::vector<Change> decode_document(const BinSlice& bytes);
+
+static std::optional<std::vector<Change>> compress_doc_changes(std::vector<DocChange>&& uncompressed_changes,
+    DepsIterator&& doc_changes_deps, usize num_changes, const std::vector<ActorId>& actors);
+
+static OldChange doc_change_to_uncompressed_change(DocChange&& change, const std::vector<ActorId>& actors);
+
 std::vector<u8> encode_document(std::vector<ChangeHash>&& heads, const std::vector<Change>& changes,
     OpSetIter&& doc_ops, const IndexedCache<ActorId>& actors_index, const std::vector<std::string_view>& props)
 {
@@ -272,7 +318,7 @@ OperationIterator Change::iter_ops() const {
 
 /////////////////////////////////////////////////////////
 
-Range read_leb128(BinSlice& bytes) {
+static Range read_leb128(BinSlice& bytes) {
     BinSlice buf = bytes;
     std::optional<usize> val;
 
@@ -284,7 +330,7 @@ Range read_leb128(BinSlice& bytes) {
     return { *val, bytes.second - buf.second };
 }
 
-Range slice_bytes(const BinSlice& bytes, Range& cursor) {
+static Range slice_bytes(const BinSlice& bytes, Range& cursor) {
     BinSlice slice = { bytes.first + cursor.first, cursor.second - cursor.first };
     auto [val, len] = read_leb128(slice);
     usize start = cursor.first + len;
@@ -351,7 +397,7 @@ Change decode_change(std::vector<u8>&& _bytes) {
     return change;
 }
 
-ChangeBytes decompress_chunk(Range&& preamble, Range&& body, std::vector<u8>&& compressed) {
+static ChangeBytes decompress_chunk(Range&& preamble, Range&& body, std::vector<u8>&& compressed) {
     auto decompressed = deflate_decompress({ compressed.cbegin() + body.first, body.second - body.first });
     std::vector<u8> result;
     result.reserve(decompressed.size() + (preamble.second - preamble.first));
@@ -364,7 +410,7 @@ ChangeBytes decompress_chunk(Range&& preamble, Range&& body, std::vector<u8>&& c
     return { true, std::move(compressed), std::move(result) };
 }
 
-std::vector<ChangeHash> decode_hashes(const BinSlice& bytes, Range& cursor) {
+static std::vector<ChangeHash> decode_hashes(const BinSlice& bytes, Range& cursor) {
     usize num_hashes = read_slice<usize>(bytes, cursor);
     std::vector<ChangeHash> hashes;
     hashes.reserve(num_hashes);
@@ -382,7 +428,7 @@ std::vector<ChangeHash> decode_hashes(const BinSlice& bytes, Range& cursor) {
     return hashes;
 }
 
-std::vector<ActorId> decode_actors(const BinSlice& bytes, Range& cursor, std::optional<ActorId>&& first) {
+static std::vector<ActorId> decode_actors(const BinSlice& bytes, Range& cursor, std::optional<ActorId>&& first) {
     usize num_actors = read_slice<usize>(bytes, cursor);
     std::vector<ActorId> actors;
     actors.reserve(num_actors + 1);
@@ -402,7 +448,7 @@ std::vector<ActorId> decode_actors(const BinSlice& bytes, Range& cursor, std::op
     return actors;
 }
 
-std::vector<std::pair<u32, usize>> decode_column_info(const BinSlice& bytes, Range& cursor, bool allow_compressed_column) {
+static std::vector<std::pair<u32, usize>> decode_column_info(const BinSlice& bytes, Range& cursor, bool allow_compressed_column) {
     usize num_columns = read_slice<usize>(bytes, cursor);
     std::vector<std::pair<u32, usize>> columns;
     columns.reserve(num_columns);
@@ -425,7 +471,7 @@ std::vector<std::pair<u32, usize>> decode_column_info(const BinSlice& bytes, Ran
     return columns;
 }
 
-std::unordered_map<u32, Range> decode_columns(Range& cursor, const std::vector<std::pair<u32, usize>>& columns) {
+static std::unordered_map<u32, Range> decode_columns(Range& cursor, const std::vector<std::pair<u32, usize>>& columns) {
     std::unordered_map<u32, Range> ops;
     for (auto& [id, length] : columns) {
         usize start = cursor.first;
@@ -436,7 +482,7 @@ std::unordered_map<u32, Range> decode_columns(Range& cursor, const std::vector<s
     return ops;
 }
 
-std::tuple<u8, ChangeHash, Range> decode_header(const BinSlice& bytes) {
+static std::tuple<u8, ChangeHash, Range> decode_header(const BinSlice& bytes) {
     auto [chunktype, body] = decode_header_without_hash(bytes);
 
     std::vector<u8> calculated_hash(picosha2::k_digest_size);
@@ -451,7 +497,7 @@ std::tuple<u8, ChangeHash, Range> decode_header(const BinSlice& bytes) {
     return { chunktype, ChangeHash(calculated_hash), body };
 }
 
-std::pair<u8, Range> decode_header_without_hash(const BinSlice& bytes) {
+static std::pair<u8, Range> decode_header_without_hash(const BinSlice& bytes) {
     if (bytes.second <= HEADER_BYTES) {
         throw std::runtime_error("not enough bytes");
     }
@@ -469,7 +515,7 @@ std::pair<u8, Range> decode_header_without_hash(const BinSlice& bytes) {
     return { bytes.first[PREAMBLE_BYTES], body };
 }
 
-std::vector<Change> load_blocks(const BinSlice& bytes) {
+static std::vector<Change> load_blocks(const BinSlice& bytes) {
     std::vector<Change> changes;
     for (auto& slice : split_blocks(bytes)) {
         decode_block(slice, changes);
@@ -478,7 +524,7 @@ std::vector<Change> load_blocks(const BinSlice& bytes) {
     return changes;
 }
 
-std::vector<BinSlice> split_blocks(const BinSlice& bytes) {
+static std::vector<BinSlice> split_blocks(const BinSlice& bytes) {
     std::vector<BinSlice> blocks;
     BinSlice cursor = bytes;
     while (true) {
@@ -500,7 +546,7 @@ std::vector<BinSlice> split_blocks(const BinSlice& bytes) {
     return blocks;
 }
 
-std::optional<Range> pop_block(const BinSlice& bytes) {
+static std::optional<Range> pop_block(const BinSlice& bytes) {
     if (bytes.second < 4 || !bin_slice_cmp({ bytes.first, 4 }, make_bin_slice(MAGIC_BYTES))) {
         return {};
     }
@@ -524,7 +570,7 @@ std::optional<Range> pop_block(const BinSlice& bytes) {
     return Range{ 0, end };
 }
 
-void decode_block(const BinSlice& bytes, std::vector<Change>& changes) {
+static void decode_block(const BinSlice& bytes, std::vector<Change>& changes) {
     if (bytes.first[PREAMBLE_BYTES] == BLOCK_TYPE_DOC) {
         vector_extend(changes, decode_document(bytes));
         return;
@@ -538,7 +584,7 @@ void decode_block(const BinSlice& bytes, std::vector<Change>& changes) {
     throw std::runtime_error("wrong chunk type");
 }
 
-std::vector<Change> decode_document(const BinSlice& bytes) {
+static std::vector<Change> decode_document(const BinSlice& bytes) {
     auto [chunktype, _hash, cursor] = decode_header(bytes);
 
     if (chunktype > 0) {
@@ -655,7 +701,7 @@ void group_doc_change_and_doc_ops(std::vector<DocChange>& changes, std::vector<D
     }
 }
 
-std::optional<std::vector<Change>> compress_doc_changes(std::vector<DocChange>&& uncompressed_changes,
+static std::optional<std::vector<Change>> compress_doc_changes(std::vector<DocChange>&& uncompressed_changes,
     DepsIterator&& doc_changes_deps, usize num_changes, const std::vector<ActorId>& actors) {
     std::vector<Change> changes;
     changes.reserve(num_changes);
@@ -681,7 +727,7 @@ std::optional<std::vector<Change>> compress_doc_changes(std::vector<DocChange>&&
     return changes;
 }
 
-OldChange doc_change_to_uncompressed_change(DocChange&& change, const std::vector<ActorId>& actors) {
+static OldChange doc_change_to_uncompressed_change(DocChange&& change, const std::vector<ActorId>& actors) {
     std::vector<OldOp> oprations;
     oprations.reserve(change.ops.size());
     for (auto& op : change.ops) {

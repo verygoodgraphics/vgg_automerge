@@ -13,7 +13,7 @@ void Decoding::decode_u8(BinSlice& bytes, std::optional<u8>& val) {
         read(bytes, 1, buffer);
         val = buffer[0];
     }
-    catch (std::exception) {
+    catch (std::exception&) {
         val.reset();
     }
 }
@@ -25,7 +25,7 @@ void Decoding::decode_u64(BinSlice& bytes, std::optional<u64>& val) {
         read_unsigned(bytes, result);
         val = result;
     }
-    catch (std::exception) {
+    catch (std::exception&) {
         val.reset();
     }
 }
@@ -37,7 +37,7 @@ void Decoding::decode_s64(BinSlice& bytes, std::optional<s64>& val) {
         read_signed(bytes, result);
         val = result;
     }
-    catch (std::exception) {
+    catch (std::exception&) {
         val.reset();
     }
 }
@@ -59,7 +59,7 @@ void Decoding::decode(BinSlice& bytes, std::optional<std::vector<u8>>& val) {
         read(bytes, *len, buffer);
         val = std::vector<u8>(buffer, buffer + *len);
     }
-    catch (std::exception) {
+    catch (std::exception&) {
         val.reset();
     }
     delete[]buffer;
@@ -138,7 +138,7 @@ void Decoding::decode_double(BinSlice& bytes, std::optional<double>& val) {
 
         val = res;
     }
-    catch (std::exception) {
+    catch (std::exception&) {
         val.reset();
     }
 }
@@ -162,7 +162,7 @@ void Decoding::decode_float(BinSlice& bytes, std::optional<float>& val) {
 
         val = res;
     }
-    catch (std::exception) {
+    catch (std::exception&) {
         val.reset();
     }
 }
@@ -178,7 +178,7 @@ void Decoding::decode_usize(BinSlice& bytes, std::optional<usize>& val) {
             val = (usize)result;
         }
     }
-    catch (std::exception) {
+    catch (std::exception&) {
         val.reset();
     }
 }
@@ -194,7 +194,7 @@ void Decoding::decode_u32(BinSlice& bytes, std::optional<u32>& val) {
             val = (u32)result;
         }
     }
-    catch (std::exception) {
+    catch (std::exception&) {
         val.reset();
     }
 }
@@ -211,7 +211,7 @@ void Decoding::decode_s32(BinSlice& bytes, std::optional<s32>& val) {
             val = (s32)result;
         }
     }
-    catch (std::exception) {
+    catch (std::exception&) {
         val.reset();
     }
 }
@@ -239,7 +239,7 @@ void Decoding::decode_action(BinSlice& bytes, std::optional<Action>& val) {
             val = (Action)result;
         }
     }
-    catch (std::exception) {
+    catch (std::exception&) {
         val.reset();
     }
 }

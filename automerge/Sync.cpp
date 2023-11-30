@@ -58,7 +58,7 @@ std::optional<SyncMessage> SyncMessage::decode(const BinSlice& bytes) {
 
     std::vector<Have> have;
     have.reserve(*have_count);
-    for (int i = 0; i < *have_count; ++i) {
+    for (usize i = 0; i < *have_count; ++i) {
         auto last_sync = decode_hashes(decoder);
         if (!last_sync.has_value()) {
             return {};
@@ -87,7 +87,7 @@ std::optional<SyncMessage> SyncMessage::decode(const BinSlice& bytes) {
 
     std::vector<Change> changes;
     changes.reserve(*change_count);
-    for (int i = 0; i < *change_count; ++i) {
+    for (usize i = 0; i < *change_count; ++i) {
         auto change_bytes = decoder.read<std::vector<u8>>();
         if (!change_bytes.has_value()) {
             return {};

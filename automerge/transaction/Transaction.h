@@ -77,7 +77,7 @@ struct TransactionInner {
     void delete_(Automerge& doc, const ExId& ex_obj, Prop&& prop);
 };
 
-struct Transaction : public Transactable {
+struct Transaction final : public Transactable {
     std::optional<TransactionInner> inner = {};
     Automerge* doc = nullptr;
 

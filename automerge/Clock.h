@@ -70,7 +70,7 @@ struct Clock {
                 d = data;
             }
         }
-        catch (std::out_of_range) {
+        catch (std::out_of_range&) {
             clock.insert({ actor_index, data });
         }
     }
@@ -80,7 +80,7 @@ struct Clock {
             auto& data = clock.at(id.actor);
             return data.max_op >= id.counter;
         }
-        catch (std::out_of_range) {
+        catch (std::out_of_range&) {
             return false;
         }
     }
@@ -89,7 +89,7 @@ struct Clock {
         try {
             return clock.at(actor_index);
         }
-        catch (std::out_of_range) {
+        catch (std::out_of_range&) {
             return {};
         }
     }
@@ -111,7 +111,7 @@ private:
                 }
                 ++others_found;
             }
-            catch (std::out_of_range) {
+            catch (std::out_of_range&) {
                 // other doesn't have this so effectively has a greater element
                 has_greater = true;
             }
