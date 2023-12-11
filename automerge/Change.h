@@ -26,6 +26,9 @@ constexpr u8 BLOCK_TYPE_DEFLATE = 2;
 constexpr usize CHUNK_START = 8;
 constexpr Range HASH_RANGE = { 4, 8 };
 
+struct Change;
+struct ChunkIntermediate;
+
 std::vector<u8> encode_document(std::vector<ChangeHash>&& heads, const std::vector<Change>& changes,
     OpSetIter&& doc_ops, const IndexedCache<ActorId>& actors_index, const std::vector<std::string_view>& props);
 
@@ -49,10 +52,51 @@ struct ChangeBytes {
             return { uncompressed.cbegin(), uncompressed.size() };
         }
     }
-};
 
-struct Change;
-struct ChunkIntermediate;
+    // throw exception
+    static Range read_leb128(BinSlice& bytes);
+
+    // throw exception
+    static Range slice_bytes(const BinSlice& bytes, Range& cursor);
+
+    // throw exception
+    static ChangeBytes decompress_chunk(Range&& preamble, Range&& body, std::vector<u8>&& compressed);
+
+    // throw exception
+    static std::vector<ChangeHash> decode_hashes(const BinSlice& bytes, Range& cursor);
+
+    // throw exception
+    static std::vector<ActorId> decode_actors(const BinSlice& bytes, Range& cursor, std::optional<ActorId>&& first);
+
+    // throw exception
+    static std::vector<std::pair<u32, usize>> decode_column_info(const BinSlice& bytes, Range& cursor, bool allow_compressed_column);
+
+    static std::unordered_map<u32, Range> decode_columns(Range& cursor, const std::vector<std::pair<u32, usize>>& columns);
+
+    // throw exception
+    static std::tuple<u8, ChangeHash, Range> decode_header(const BinSlice& bytes);
+
+    // throw exception
+    static std::pair<u8, Range> decode_header_without_hash(const BinSlice& bytes);
+
+    // throw exception
+    template<class T>
+    static T read_slice(const BinSlice& bytes, Range& cursor) {
+        BinSlice view = { bytes.first + cursor.first, cursor.second - cursor.first };
+        usize init_len = view.second;
+
+        std::optional<T> val;
+        Decoding::decode(view, val);
+        if (!val.has_value()) {
+            throw std::runtime_error("no decoded value");
+        }
+
+        usize bytes_read = init_len - view.second;
+        cursor.first += bytes_read;
+
+        return *val;
+    }
+};
 
 // #[derive(Deserialize, Serialize, Debug, Clone)]
 struct OldChange {
@@ -84,6 +128,8 @@ struct OldChange {
 
     // note: consume operations
     ChunkIntermediate encode_chunk(const std::vector<ChangeHash>& deps);
+
+    static OldChange doc_change_to_uncompressed_change(DocChange&& change, const std::vector<ActorId>& actors);
 };
 
 struct ChunkIntermediate {
@@ -94,10 +140,6 @@ struct ChunkIntermediate {
     std::unordered_map<u32, Range> ops = {};
     Range extra_bytes = {};
 };
-
-// TryFrom<Vec<u8>> for Change
-// throw exception
-Change decode_change(std::vector<u8>&& _bytes);
 
 // #[derive(PartialEq, Debug, Clone)]
 struct Change {
@@ -158,28 +200,32 @@ struct Change {
     void compress() {
         bytes.compress(body_start);
     }
+    
+    // throw exception
+    static std::vector<Change> load_blocks(const BinSlice& bytes);
+
+    // throw exception
+    static std::vector<BinSlice> split_blocks(const BinSlice& bytes);
+
+    // throw exception
+    static std::optional<Range> pop_block(const BinSlice& bytes);
+
+    // throw exception
+    static void decode_block(const BinSlice& bytes, std::vector<Change>& changes);
+
+    // throw exception
+    static std::vector<Change> decode_document(const BinSlice& bytes);
+
+    // throw exception
+    static void group_doc_change_and_doc_ops(std::vector<DocChange>& changes, std::vector<DocOp>&& ops, const std::vector<ActorId>& actors);
+
+    static std::optional<std::vector<Change>> compress_doc_changes(std::vector<DocChange>&& uncompressed_changes,
+        DepsIterator&& doc_changes_deps, usize num_changes, const std::vector<ActorId>& actors);
+
+    // TryFrom<Vec<u8>> for Change
+    // throw exception
+    static Change decode_change(std::vector<u8>&& _bytes);
 };
-
-// throw exception
-template<class T>
-static T read_slice(const BinSlice& bytes, Range& cursor) {
-    BinSlice view = { bytes.first + cursor.first, cursor.second - cursor.first };
-    usize init_len = view.second;
-
-    std::optional<T> val;
-    Decoding::decode(view, val);
-    if (!val.has_value()) {
-        throw std::runtime_error("no decoded value");
-    }
-
-    usize bytes_read = init_len - view.second;
-    cursor.first += bytes_read;
-
-    return *val;
-}
-
-// throw exception
-void group_doc_change_and_doc_ops(std::vector<DocChange>& changes, std::vector<DocOp>&& ops, const std::vector<ActorId>& actors);
 
 // throw exception
 std::vector<Change> load_document(const BinSlice& bytes);
