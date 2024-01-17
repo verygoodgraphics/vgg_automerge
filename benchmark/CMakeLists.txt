@@ -5,6 +5,7 @@ set(BENCHMARK_ENABLE_TESTING NO)
 include(FetchContent)
 FetchContent_Declare(
     googlebenchmark
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
     # v1.8.0
     URL  https://github.com/google/benchmark/archive/2dd015dfef425c866d9a43f2c67d8b52d709acb6.zip
 )

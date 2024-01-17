@@ -3,7 +3,8 @@ cmake_minimum_required (VERSION 3.12)
 include(FetchContent)
 FetchContent_Declare(
 	googletest
-	// v1.13.0
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+	# v1.13.0
 	URL  https://github.com/google/googletest/archive/b796f7d44681514f58a683a3a71ff17c94edb0c1.zip
 )
 # For Windows: Prevent overriding the parent project's compiler/linker settings
